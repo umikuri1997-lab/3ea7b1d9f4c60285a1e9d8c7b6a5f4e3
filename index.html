@@ -178,7 +178,6 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 // ===== RENDERER =====
 const container = document.getElementById('canvas-container');
@@ -230,9 +229,21 @@ const rgbeLoader = new RGBELoader();
 const pmremGenerator = new THREE.PMREMGenerator(renderer);
 pmremGenerator.compileEquirectangularShader();
 
-// HDRがない場合でもメタリックが黒くならないようニュートラル環境マップを設定
-const neutralEnv = pmremGenerator.fromScene(new THREE.RoomEnvironment()).texture;
-scene.environment = neutralEnv;
+// HDRがない場合でも黒くならないニュートラル環境マップ（Canvas生成）
+{
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 32;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 32);
+  g.addColorStop(0, '#aaaaaa');
+  g.addColorStop(1, '#555555');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 32);
+  const tex = new THREE.CanvasTexture(c);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  const neutralEnv = pmremGenerator.fromEquirectangular(tex).texture;
+  tex.dispose();
+  scene.environment = neutralEnv;
+}
 
 let currentEnvMap = null;
 let hdrBgEnabled = true;
