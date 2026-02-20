@@ -88,8 +88,6 @@
 
   /* Bottom right */
   #bottom-right{position:absolute;bottom:20px;right:20px;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:all;}
-  #qr-wrap{background:#fff;padding:10px;display:none;}
-
   #lock-msg{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(10,10,11,0.85);border:1px solid var(--border);padding:8px 16px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);pointer-events:none;white-space:nowrap;display:none;}
 
   body.walking{cursor:none;}
@@ -166,13 +164,6 @@
   </div>
 
   <div id="crosshair"></div>
-
-  <div id="bottom-right">
-    <div id="qr-wrap"><canvas id="qr-canvas"></canvas></div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="btn secondary" id="btn-qr" onclick="toggleQR()" style="display:none">QR</button>
-    </div>
-  </div>
 
   <div id="lock-msg">クリックして歩行モード開始 — Escで解放</div>
   <div id="fps-badge"></div>
@@ -280,25 +271,34 @@ async function buildHDRPanel() {
     btn.onclick = () => loadHDR(i);
     container.appendChild(btn);
   });
+
+  // 最初のHDRを自動ロード（エラーは静かに無視）
+  if (HDR_PRESETS.length > 0) {
+    loadHDR(0).catch(() => {});
+  }
 }
 
 function loadHDR(idx) {
   const preset = HDR_PRESETS[idx];
-  if (!preset) return;
+  if (!preset) return Promise.resolve();
   document.querySelectorAll('.hdr-preset-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
   activeHdrIdx = idx;
   const url = './hdr/' + preset.file;
-  rgbeLoader.load(url, (texture) => {
-    if (currentEnvMap) currentEnvMap.dispose();
-    currentEnvMap = pmremGenerator.fromEquirectangular(texture).texture;
-    texture.dispose();
-    scene.environment = currentEnvMap;
-    if (hdrBgEnabled) {
-      scene.background = currentEnvMap;
-      scene.backgroundIntensity = 500;
-    }
-  }, undefined, () => {
-    console.warn('HDR読み込み失敗:', url);
+  return new Promise((resolve, reject) => {
+    rgbeLoader.load(url, (texture) => {
+      if (currentEnvMap) currentEnvMap.dispose();
+      currentEnvMap = pmremGenerator.fromEquirectangular(texture).texture;
+      texture.dispose();
+      scene.environment = currentEnvMap;
+      if (hdrBgEnabled) {
+        scene.background = currentEnvMap;
+        scene.backgroundIntensity = 500;
+      }
+      resolve();
+    }, undefined, (err) => {
+      console.warn('HDR読み込み失敗:', url);
+      reject(err);
+    });
   });
 }
 
@@ -341,7 +341,6 @@ function loadGLB(url, displayUrl) {
   const newUrl = new URL(window.location.href);
   newUrl.searchParams.set('glb', url);
   window.history.replaceState({}, '', newUrl.toString());
-  updateQR();
 
   gltfLoader.load(url, (gltf) => {
     if (loadedModel) scene.remove(loadedModel);
@@ -350,11 +349,22 @@ function loadGLB(url, displayUrl) {
       if (obj.isMesh) {
         obj.castShadow = true;
         obj.receiveShadow = true;
-        // VSM用: マテリアルのshadowSide設定
-        if (obj.material) {
-          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-          mats.forEach(m => { if (m) m.shadowSide = THREE.FrontSide; });
-        }
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach((m, mi) => {
+          if (!m) return;
+          // MeshStandardMaterial以外はroughness/metalnessがないので変換
+          if (!m.isMeshStandardMaterial) {
+            const std = new THREE.MeshStandardMaterial();
+            std.copy(m);
+            if (Array.isArray(obj.material)) obj.material[mi] = std;
+            else obj.material = std;
+            m = std;
+          }
+          m.shadowSide = THREE.FrontSide;
+          m.roughness  = Math.max(0, (m.roughness ?? 0.5) - 0.5);
+          m.metalness  = Math.min(1, (m.metalness ?? 0)   + 0.5);
+          m.needsUpdate = true;
+        });
       }
     });
     scene.add(gltf.scene);
@@ -392,7 +402,6 @@ function loadGLB(url, displayUrl) {
     overlay.style.display = 'none';
     loadBar.style.display = 'none';
     document.getElementById('btn-reload').style.display = '';
-    document.getElementById('btn-qr').style.display = '';
     document.getElementById('lock-msg').style.display = 'block';
     const parts = (displayUrl || url).split('/');
     document.getElementById('model-name').textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb');
@@ -485,38 +494,6 @@ function updateWalk() {
     moveDir.normalize().multiplyScalar(moveSpeed).applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)));
     walkCamera.position.add(moveDir);
   }
-}
-
-// ===== QR =====
-function loadQRLib() {
-  return new Promise((res, rej) => {
-    if (window.QRCode) { res(); return; }
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
-    s.onload = res; s.onerror = rej;
-    document.head.appendChild(s);
-  });
-}
-let qrVisible = false;
-window.toggleQR = async function() {
-  qrVisible = !qrVisible;
-  const wrap = document.getElementById('qr-wrap');
-  if (qrVisible) {
-    wrap.style.display = 'block'; // 先に表示してからcanvasサイズを確保
-    await loadQRLib();
-    // 既存canvasをクリアして新規生成
-    const oldCanvas = document.getElementById('qr-canvas');
-    const newCanvas = document.createElement('canvas');
-    newCanvas.id = 'qr-canvas';
-    oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
-    QRCode.toCanvas(newCanvas, window.location.href, { width: 120, margin: 1, color: { dark: '#000', light: '#fff' } });
-  } else {
-    wrap.style.display = 'none';
-  }
-};
-function updateQR() {
-  if (!qrVisible || !window.QRCode) return;
-  QRCode.toCanvas(document.getElementById('qr-canvas'), window.location.href, { width: 120, margin: 1, color: { dark: '#000', light: '#fff' } });
 }
 
 // ===== PANEL / SECTION =====

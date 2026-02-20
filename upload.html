@@ -215,10 +215,6 @@
 </div>
 
 <script>
-// QR lib
-function loadQRLib(){return new Promise((res,rej)=>{if(window.QRCode){res();return;}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
-loadQRLib().catch(()=>{});
-
 // DRAWER
 function openDrawer(){document.getElementById('settings-drawer').classList.add('open');document.getElementById('drawer-overlay').classList.add('open');}
 function closeDrawer(){document.getElementById('settings-drawer').classList.remove('open');document.getElementById('drawer-overlay').classList.remove('open');}
@@ -343,7 +339,7 @@ async function uploadAll(){
       const glbUrl=`${sbUrl}/storage/v1/object/public/${sbBucket}/${encodeURIComponent(item.newName)}`;
       const viewerUrl=viewerBase?`${viewerBase}?glb=${encodeURIComponent(glbUrl)}`:glbUrl;
       item.status='done';setPb(item.id,100);setSt(item.id,'done','完了 ✓');
-      await showResult(item.id,glbUrl,viewerUrl);
+      showResult(item.id,glbUrl,viewerUrl);
       addLog('  ✓ 完了','ok');
     }catch(e){item.status='error';setSt(item.id,'error','エラー');addLog(`  ✗ ${e.message}`,'err');}
   }
@@ -352,18 +348,21 @@ async function uploadAll(){
 }
 
 // RESULT
-async function showResult(id,glbUrl,viewerUrl){
+function showResult(id,glbUrl,viewerUrl){
   const sec=document.getElementById('rs-'+id);if(!sec)return;
+  // QR: 外部ライブラリ不要、画像APIを使用（CDNブロック問題を回避）
+  const qrImgUrl=`https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${encodeURIComponent(viewerUrl)}&margin=1`;
   sec.innerHTML=`
     <div class="result-label">GLB直接URL</div>
     <div class="url-row"><div class="url-text" id="gu-${id}">${esc(glbUrl)}</div><button class="copy-btn" id="cgb-${id}" onclick="doCopy('gu-${id}','cgb-${id}')">コピー</button></div>
     <div class="result-label">🔗 ビューアーURL</div>
     <div class="url-row"><div class="url-text viewer" id="vu-${id}">${esc(viewerUrl)}</div><button class="copy-btn" id="cvb-${id}" onclick="doCopy('vu-${id}','cvb-${id}')">コピー</button></div>
-    <div class="qr-wrap"><canvas id="qrc-${id}"></canvas><div class="qr-info"><div class="qr-title">📱 QRコード</div><div class="qr-hint">スキャンするとビューアーで<br>このGLBが開きます</div></div></div>
+    <div class="qr-wrap">
+      <img src="${qrImgUrl}" width="128" height="128" style="flex-shrink:0;border-radius:4px;background:#fff;" onerror="this.style.display='none'">
+      <div class="qr-info"><div class="qr-title">📱 QRコード</div><div class="qr-hint">スキャンするとビューアーで<br>このGLBが開きます</div></div>
+    </div>
   `;
   sec.classList.add('visible');
-  try{await loadQRLib();QRCode.toCanvas(document.getElementById('qrc-'+id),viewerUrl,{width:120,margin:1,color:{dark:'#000',light:'#fff'}});}
-  catch(e){const c=document.getElementById('qrc-'+id);if(c)c.style.display='none';}
 }
 
 // HELPERS
