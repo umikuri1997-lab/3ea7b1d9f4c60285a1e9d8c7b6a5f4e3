@@ -1380,11 +1380,17 @@ function initThree() {
 
 // ===== HDRI Background / Environment (Reflections) =====
 async function initEnvironmentHDR() {
-  const hdrUrl = 'Background.hdr'; // システムフォルダ内（HTMLと同じ場所）
+  const hdrUrl = 'Background.hdr';
   if (!state.scene || !state.renderer) return;
 
-  // file:// 直開きは fetch が CORS で失敗するため、自動読込はスキップ（HDRはUIから選択）
-  if (location.protocol === 'file:') {
+  // file:// またはGitHub Pages（HDRファイルなし）はスキップ
+  if (location.protocol === 'file:') return;
+
+  // HEADリクエストで存在確認してからロード
+  try {
+    const check = await fetch(hdrUrl, { method: 'HEAD' });
+    if (!check.ok) return; // 404なら静かにスキップ
+  } catch {
     return;
   }
 
@@ -1394,7 +1400,7 @@ async function initEnvironmentHDR() {
     const hdrEquirect = await loader.loadAsync(hdrUrl);
     setEnvironmentFromEquirect(hdrEquirect);
   } catch (e) {
-    console.warn('HDRI auto-load failed (Background.hdr not found?):', e);
+    console.warn('HDRI auto-load failed:', e);
   }
 }
 
@@ -2076,6 +2082,10 @@ const joystickInput = { x: 0, y: 0 }; // x: 左右, y: 前後（-1〜1）
 
 function initJoystick() {
   if (!IS_TOUCH) return;
+  if (typeof nipplejs === 'undefined') {
+    console.warn('nipplejs not loaded, joystick disabled');
+    return;
+  }
 
   const zone = document.getElementById('joystick-zone');
   zone.style.display = 'block';
@@ -3268,87 +3278,19 @@ function animate() {
 
 // ===== 同フォルダGLTF自動検出＆読み込み =====
 async function autoLoadGLTF() {
-  // file:// では動作しない
-  if (location.protocol === 'file:') return;
-
-  const baseDir = location.href.substring(0, location.href.lastIndexOf('/') + 1);
-  // baseDir は「…/システム/」なので、1つ上に戻って「物件データ/」を指す
-  const parentDir = baseDir.substring(0, baseDir.slice(0, -1).lastIndexOf('/') + 1);
-  const dataDir = parentDir + encodeURIComponent('物件データ') + '/';
-
-  // ① URLパラメータ ?model=xxx.glb があればそれを優先
+  // URLパラメータ ?model=xxx.glb があれば読み込む（GitHub Pages対応）
   const params = new URLSearchParams(location.search);
   const modelParam = params.get('model');
   if (modelParam) {
+    const baseDir = location.href.substring(0, location.href.lastIndexOf('/') + 1);
     const url = new URL(modelParam, baseDir).href;
     console.log(`Loading GLTF from URL param: ${modelParam}`);
     loadGLTFFromURL(url, modelParam.split('/').pop());
     return;
   }
-
-  // ② 物件データフォルダのディレクトリ一覧を取得してGLTF/GLBを探す
-  try {
-    const resp = await fetch(dataDir);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-
-    const contentType = resp.headers.get('content-type') || '';
-    const text = await resp.text();
-
-    // ディレクトリ一覧かどうか判定（HTMLページの中にファイルリンクがあるか）
-    const gltfFiles = [];
-
-    // href属性からGLTF/GLBファイルを探す（Python http.server, Apache autoindex, nginx 等）
-    const hrefRegex = /href="([^"]*?\.(gltf|glb))(?:\?[^"]*)?"[^>]*>/gi;
-    let match;
-    while ((match = hrefRegex.exec(text)) !== null) {
-      const name = decodeURIComponent(match[1]);
-      if (!gltfFiles.includes(name)) gltfFiles.push(name);
-    }
-
-    // href='...' 形式（シングルクォート）にも対応
-    const hrefRegex2 = /href='([^']*?\.(gltf|glb))(?:\?[^']*)?"[^>]*>/gi;
-    while ((match = hrefRegex2.exec(text)) !== null) {
-      const name = decodeURIComponent(match[1]);
-      if (!gltfFiles.includes(name)) gltfFiles.push(name);
-    }
-
-    // プレーンテキスト一覧（一部サーバ用）
-    if (gltfFiles.length === 0 && !contentType.includes('text/html')) {
-      const lineRegex = /^([\w\-. ()]+\.(gltf|glb))$/gim;
-      while ((match = lineRegex.exec(text)) !== null) {
-        const name = match[1];
-        if (!gltfFiles.includes(name)) gltfFiles.push(name);
-      }
-    }
-
-    if (gltfFiles.length > 0) {
-      const fileName = gltfFiles[0];
-      // ファイル名をエンコード（日本語対応）
-      const fileUrl = dataDir + encodeURIComponent(fileName);
-      console.log(`Auto-loading GLTF from directory listing: ${fileName}`);
-      loadGLTFFromURL(fileUrl, fileName);
-      return;
-    }
-  } catch (e) {
-    console.log('Directory listing fetch failed:', e.message);
-  }
-
-  // ③ ディレクトリ一覧が使えない場合、HEADリクエストで存在チェック
-  const commonNames = ['model.glb', 'model.gltf', 'scene.glb', 'scene.gltf', 'house.glb', 'house.gltf'];
-  for (const name of commonNames) {
-    try {
-      const url = dataDir + name;
-      const headResp = await fetch(url, { method: 'HEAD' });
-      if (headResp.ok) {
-        console.log(`Auto-loading GLTF by HEAD check: ${name}`);
-        loadGLTFFromURL(url, name);
-        return;
-      }
-    } catch {}
-  }
-
-  console.log('No GLTF files found for auto-loading');
+  console.log('No model param. Waiting for file selection.');
 }
+
 
 // ===== Matcap System =====
 const MATCAP_API = '/api/matcaps';
@@ -3358,30 +3300,12 @@ async function loadMatcapList() {
   const gallery = document.getElementById('matcap-gallery');
   const loading = document.getElementById('matcap-loading');
 
-  // file:// の場合はAPIが使えない
-  if (location.protocol === 'file:') {
-    if (loading) loading.textContent = 'サーバー経由で起動してください';
-    return;
-  }
-
-  try {
-    const resp = await fetch(MATCAP_API, { cache: 'no-store' });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    state.matcapFiles = data.files || [];
-  } catch (e) {
-    console.warn('[Matcap] API load failed:', e);
-    state.matcapFiles = [];
-  }
+  // GitHub Pages / 静的ホスティングではmatcap APIは使えない
+  // ファイルアップロードで追加する方式のみ対応
+  state.matcapFiles = [];
 
   if (loading) loading.remove();
-
-  if (state.matcapFiles.length === 0) {
-    gallery.innerHTML = '<div class="hint">matcapsフォルダにファイルがありません</div>';
-    return;
-  }
-
-  renderMatcapGallery();
+  gallery.innerHTML = '<div class="hint">matcapsフォルダにファイルがありません</div>';
 }
 
 function renderMatcapGallery() {
