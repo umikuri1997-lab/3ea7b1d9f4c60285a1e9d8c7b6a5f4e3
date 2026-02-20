@@ -211,9 +211,9 @@ const renderPass = new RenderPass(scene, walkCamera);
 composer.addPass(renderPass);
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.15,   // strength – 控えめなグロー
-  0.6,    // radius
-  0.85    // threshold – 明るい部分だけ光る
+  0.06,   // strength – ごく控えめなグロー
+  0.4,    // radius
+  0.9     // threshold – より明るい部分だけ光る
 );
 composer.addPass(bloomPass);
 const outputPass = new OutputPass();
@@ -389,7 +389,7 @@ function loadGLB(url, displayUrl) {
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         mats.forEach(mat => {
           if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
-            mat.envMapIntensity = 1.8;
+            mat.envMapIntensity = 1.4;
             mat.needsUpdate = true;
           }
         });
