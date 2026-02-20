@@ -364,16 +364,6 @@ function loadGLB(url, displayUrl) {
       if (obj.isMesh) {
         obj.castShadow = true;
         obj.receiveShadow = true;
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        mats.forEach(m => {
-          if (!m) return;
-          // MeshStandardMaterialのみ roughness/metalness を調整
-          if (m.isMeshStandardMaterial) {
-            m.roughness = Math.max(0, (m.roughness ?? 0.5) - 0.5);
-            m.metalness = Math.min(1, (m.metalness ?? 0)   + 0.5);
-            m.needsUpdate = true;
-          }
-        });
       }
     });
     scene.add(gltf.scene);
