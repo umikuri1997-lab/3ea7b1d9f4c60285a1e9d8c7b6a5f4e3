@@ -6,392 +6,110 @@
 <title>GLB アップローダー</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap');
-
   :root {
-    --bg: #0d0d10;
-    --surface: #15151a;
-    --surface2: #1c1c24;
-    --border: rgba(255,255,255,0.07);
-    --accent: #4fc3f7;
-    --accent-dim: rgba(79,195,247,0.12);
-    --success: #66bb6a;
-    --success-dim: rgba(102,187,106,0.12);
-    --warn: #ffa726;
-    --danger: #ef5350;
-    --text: #e8eaed;
-    --muted: #9aa0a6;
-    --font: 'Noto Sans JP', sans-serif;
-    --mono: 'JetBrains Mono', monospace;
-    --r: 10px;
+    --bg:#0d0d10;--surface:#15151a;--surface2:#1c1c24;--border:rgba(255,255,255,0.07);
+    --accent:#4fc3f7;--accent-dim:rgba(79,195,247,0.12);
+    --success:#66bb6a;--success-dim:rgba(102,187,106,0.12);
+    --warn:#ffa726;--danger:#ef5350;--text:#e8eaed;--muted:#9aa0a6;
+    --font:'Noto Sans JP',sans-serif;--mono:'JetBrains Mono',monospace;--r:10px;
   }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 40px 20px 60px;
-  }
-
-  .page-title {
-    font-size: 22px;
-    font-weight: 500;
-    letter-spacing: 2px;
-    margin-bottom: 6px;
-  }
-  .page-title span { color: var(--accent); }
-
-  .page-sub {
-    font-size: 12px;
-    color: var(--muted);
-    margin-bottom: 32px;
-  }
-
-  .card {
-    width: 100%;
-    max-width: 560px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    padding: 24px;
-    margin-bottom: 16px;
-  }
-
-  .card-title {
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 16px;
-  }
-
-  .field { margin-bottom: 12px; }
-
-  .field label {
-    display: block;
-    font-size: 12px;
-    color: var(--muted);
-    margin-bottom: 5px;
-  }
-
-  .field input {
-    width: 100%;
-    padding: 10px 14px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 7px;
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 12px;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-
-  .field input:focus { border-color: var(--accent); }
-  .field input::placeholder { color: rgba(255,255,255,0.2); }
-
-  .btn {
-    width: 100%;
-    padding: 11px;
-    background: var(--accent);
-    border: none;
-    border-radius: 7px;
-    color: #000;
-    font-size: 13px;
-    font-weight: 500;
-    font-family: var(--font);
-    cursor: pointer;
-    transition: opacity 0.2s;
-  }
-  .btn:hover { opacity: 0.85; }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn.secondary {
-    background: var(--surface2);
-    color: var(--muted);
-    border: 1px solid var(--border);
-  }
-  .btn.secondary:hover { color: var(--text); border-color: rgba(255,255,255,0.15); }
-
-  .config-saved {
-    font-size: 11px;
-    color: var(--success);
-    margin-top: 8px;
-    display: none;
-  }
-
-  /* Drop zone */
-  #drop-zone {
-    border: 2px dashed rgba(255,255,255,0.1);
-    border-radius: var(--r);
-    padding: 48px 24px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.25s;
-    position: relative;
-  }
-
-  #drop-zone:hover,
-  #drop-zone.drag-over {
-    border-color: var(--accent);
-    background: var(--accent-dim);
-  }
-
-  #drop-zone .drop-icon {
-    font-size: 40px;
-    margin-bottom: 12px;
-    opacity: 0.5;
-  }
-
-  #drop-zone p {
-    font-size: 14px;
-    color: var(--muted);
-    margin-bottom: 4px;
-  }
-
-  #drop-zone .hint {
-    font-size: 11px;
-    color: rgba(255,255,255,0.2);
-  }
-
-  #file-input { display: none; }
-
-  /* File queue */
-  #file-queue {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .file-item {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 14px;
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .file-item .file-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
-
-  .file-item .file-info { flex: 1; min-width: 0; }
-
-  .file-item .file-orig {
-    font-size: 11px;
-    color: var(--muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-bottom: 3px;
-  }
-
-  .file-item .file-new {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--accent);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .file-item .file-size {
-    font-size: 10px;
-    color: var(--muted);
-    margin-top: 3px;
-  }
-
-  .file-item .file-status {
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 4px;
-    flex-shrink: 0;
-    align-self: center;
-  }
-
-  .file-status.pending  { background: rgba(255,255,255,0.05); color: var(--muted); }
-  .file-status.processing { background: rgba(79,195,247,0.15); color: var(--accent); }
-  .file-status.done   { background: var(--success-dim); color: var(--success); }
-  .file-status.error  { background: rgba(239,83,80,0.15); color: var(--danger); }
-
-  .file-remove {
-    background: none;
-    border: none;
-    color: var(--muted);
-    cursor: pointer;
-    font-size: 16px;
-    padding: 0 4px;
-    align-self: flex-start;
-    transition: color 0.2s;
-  }
-  .file-remove:hover { color: var(--danger); }
-
-  /* Progress bar */
-  .progress-wrap {
-    height: 3px;
-    background: var(--border);
-    border-radius: 2px;
-    margin-top: 6px;
-    overflow: hidden;
-    display: none;
-  }
-  .progress-wrap.visible { display: block; }
-  .progress-bar {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 2px;
-    width: 0%;
-    transition: width 0.2s;
-  }
-
-  /* Result URL */
-  .result-url {
-    margin-top: 6px;
-    display: none;
-  }
-  .result-url.visible { display: block; }
-
-  .url-row {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    margin-top: 4px;
-  }
-
-  .url-text {
-    flex: 1;
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--success);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    background: var(--success-dim);
-    padding: 5px 8px;
-    border-radius: 5px;
-    border: 1px solid rgba(102,187,106,0.2);
-    cursor: text;
-    user-select: all;
-  }
-
-  .copy-btn {
-    padding: 5px 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    color: var(--muted);
-    font-size: 11px;
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-  }
-  .copy-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-  .copy-btn.copied { color: var(--success); border-color: var(--success); }
-
-  /* Options */
-  .option-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .option-row:last-child { border-bottom: none; }
-
-  .toggle {
-    position: relative;
-    width: 36px;
-    height: 20px;
-    flex-shrink: 0;
-  }
-  .toggle input { opacity: 0; width: 0; height: 0; }
-  .toggle-slider {
-    position: absolute;
-    inset: 0;
-    background: rgba(255,255,255,0.1);
-    border-radius: 20px;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-  .toggle-slider::before {
-    content: '';
-    position: absolute;
-    width: 14px; height: 14px;
-    left: 3px; top: 3px;
-    background: #fff;
-    border-radius: 50%;
-    transition: transform 0.2s;
-  }
-  .toggle input:checked + .toggle-slider { background: var(--accent); }
-  .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
-
-  .option-label {
-    flex: 1;
-    font-size: 13px;
-  }
-  .option-desc {
-    font-size: 11px;
-    color: var(--muted);
-  }
-
-  /* Upload all btn area */
-  #upload-section { display: none; }
-  #upload-section.visible { display: block; }
-
-  .btn-row {
-    display: flex;
-    gap: 8px;
-  }
-  .btn-row .btn { flex: 1; }
-
-  /* Log */
-  #log-area {
-    width: 100%;
-    max-width: 560px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    padding: 16px;
-    display: none;
-  }
-  #log-area.visible { display: block; }
-  #log-content {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--muted);
-    max-height: 160px;
-    overflow-y: auto;
-    line-height: 1.8;
-  }
-  #log-content .log-ok { color: var(--success); }
-  #log-content .log-err { color: var(--danger); }
-  #log-content .log-info { color: var(--accent); }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:40px 20px 60px;}
+  .page-title{font-size:22px;font-weight:500;letter-spacing:2px;margin-bottom:6px;}
+  .page-title span{color:var(--accent);}
+  .page-sub{font-size:12px;color:var(--muted);margin-bottom:32px;}
+  .card{width:100%;max-width:560px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;margin-bottom:16px;}
+  .card-title{font-size:11px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
+  .field input{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:border-color 0.2s;}
+  .field input:focus{border-color:var(--accent);}
+  .field input::placeholder{color:rgba(255,255,255,0.2);}
+  .btn{width:100%;padding:11px;background:var(--accent);border:none;border-radius:7px;color:#000;font-size:13px;font-weight:500;font-family:var(--font);cursor:pointer;transition:opacity 0.2s;}
+  .btn:hover{opacity:0.85;}.btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn.secondary{background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
+  .btn.secondary:hover{color:var(--text);border-color:rgba(255,255,255,0.15);}
+  .config-saved{font-size:11px;color:var(--success);margin-top:8px;display:none;}
+  #drop-zone{border:2px dashed rgba(255,255,255,0.1);border-radius:var(--r);padding:48px 24px;text-align:center;cursor:pointer;transition:all 0.25s;}
+  #drop-zone:hover,#drop-zone.drag-over{border-color:var(--accent);background:var(--accent-dim);}
+  #drop-zone .drop-icon{font-size:40px;margin-bottom:12px;opacity:0.5;}
+  #drop-zone p{font-size:14px;color:var(--muted);margin-bottom:4px;}
+  #drop-zone .hint{font-size:11px;color:rgba(255,255,255,0.2);}
+  #file-input{display:none;}
+  #file-queue{display:flex;flex-direction:column;gap:8px;}
+  .file-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px;}
+  .file-icon{font-size:20px;flex-shrink:0;margin-top:2px;}
+  .file-info{flex:1;min-width:0;}
+  .file-orig{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
+  .file-new{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .file-size{font-size:10px;color:var(--muted);margin-top:3px;}
+  .file-status{font-size:11px;padding:3px 8px;border-radius:4px;flex-shrink:0;align-self:flex-start;margin-top:2px;}
+  .file-status.pending{background:rgba(255,255,255,0.05);color:var(--muted);}
+  .file-status.processing{background:rgba(79,195,247,0.15);color:var(--accent);}
+  .file-status.done{background:var(--success-dim);color:var(--success);}
+  .file-status.error{background:rgba(239,83,80,0.15);color:var(--danger);}
+  .file-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px;align-self:flex-start;transition:color 0.2s;}
+  .file-remove:hover{color:var(--danger);}
+  .progress-wrap{height:3px;background:var(--border);border-radius:2px;margin-top:6px;overflow:hidden;display:none;}
+  .progress-wrap.visible{display:block;}
+  .progress-bar{height:100%;background:var(--accent);border-radius:2px;width:0%;transition:width 0.2s;}
+  .result-section{margin-top:10px;display:none;}
+  .result-section.visible{display:block;}
+  .result-label{font-size:10px;color:var(--muted);margin-bottom:4px;margin-top:8px;letter-spacing:0.5px;}
+  .url-row{display:flex;gap:6px;align-items:center;margin-bottom:2px;}
+  .url-text{flex:1;font-family:var(--mono);font-size:10px;color:var(--success);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--success-dim);padding:5px 8px;border-radius:5px;border:1px solid rgba(102,187,106,0.2);cursor:text;user-select:all;}
+  .url-text.viewer{color:var(--accent);background:var(--accent-dim);border-color:rgba(79,195,247,0.2);}
+  .copy-btn{padding:5px 10px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:11px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+  .copy-btn:hover{color:var(--text);border-color:rgba(255,255,255,0.2);}
+  .copy-btn.copied{color:var(--success);border-color:var(--success);}
+  .qr-wrap{display:flex;align-items:flex-start;gap:14px;margin-top:10px;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--border);}
+  .qr-wrap canvas{flex-shrink:0;border-radius:4px;}
+  .qr-info{flex:1;}
+  .qr-title{font-size:12px;color:var(--accent);margin-bottom:5px;font-weight:500;}
+  .qr-hint{font-size:11px;color:var(--muted);line-height:1.7;}
+  .option-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+  .option-row:last-child{border-bottom:none;}
+  .toggle{position:relative;width:36px;height:20px;flex-shrink:0;}
+  .toggle input{opacity:0;width:0;height:0;}
+  .toggle-slider{position:absolute;inset:0;background:rgba(255,255,255,0.1);border-radius:20px;cursor:pointer;transition:background 0.2s;}
+  .toggle-slider::before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform 0.2s;}
+  .toggle input:checked+.toggle-slider{background:var(--accent);}
+  .toggle input:checked+.toggle-slider::before{transform:translateX(16px);}
+  .option-label{flex:1;font-size:13px;}
+  .option-desc{font-size:11px;color:var(--muted);}
+  #upload-section{display:none;}
+  #upload-section.visible{display:block;}
+  .btn-row{display:flex;gap:8px;}
+  .btn-row .btn{flex:1;}
+  #log-area{width:100%;max-width:560px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;display:none;}
+  #log-area.visible{display:block;}
+  #log-content{font-family:var(--mono);font-size:11px;color:var(--muted);max-height:160px;overflow-y:auto;line-height:1.8;}
+  .log-ok{color:var(--success);}.log-err{color:var(--danger);}.log-info{color:var(--accent);}
 </style>
 </head>
 <body>
 
 <div class="page-title">GLB <span>Upload</span></div>
-<div class="page-sub">日本語ファイル名を英語に変換 ・ ライト削除 ・ Supabaseへアップロード</div>
+<div class="page-sub">日本語ファイル名変換 ・ ライト削除 ・ ビューアURL & QR自動生成</div>
 
-<!-- Supabase Config -->
+<!-- Config -->
 <div class="card" id="config-card">
-  <div class="card-title">⚙️ Supabase 設定（初回のみ）</div>
+  <div class="card-title">⚙️ 設定（初回のみ）</div>
   <div class="field">
-    <label>Project URL</label>
+    <label>Supabase Project URL</label>
     <input type="text" id="supabase-url" placeholder="https://xxxxxxxxxxxx.supabase.co" />
   </div>
   <div class="field">
-    <label>Anon Key（公開キー）</label>
-    <input type="text" id="supabase-key" placeholder="eyJhbGciOiJIUzI1NiIs..." />
+    <label>Service Role Key</label>
+    <input type="password" id="supabase-key" placeholder="eyJhbGciOiJIUzI1NiIs..." />
   </div>
   <div class="field">
     <label>バケット名</label>
-    <input type="text" id="supabase-bucket" placeholder="glb-models" value="glb-models" />
+    <input type="text" id="supabase-bucket" value="glb-models" />
+  </div>
+  <div class="field">
+    <label>ビューアーURL（QRに使用）</label>
+    <input type="text" id="viewer-url" placeholder="https://umikuri1997-lab.github.io/3ea7b1d9f4c60285a1e9d8c7b6a5f4e3/" />
   </div>
   <button class="btn" onclick="saveConfig()">設定を保存</button>
   <div class="config-saved" id="config-saved">✓ 設定を保存しました</div>
@@ -401,24 +119,12 @@
 <div class="card">
   <div class="card-title">🔧 処理オプション</div>
   <div class="option-row">
-    <label class="toggle">
-      <input type="checkbox" id="opt-rename" checked>
-      <div class="toggle-slider"></div>
-    </label>
-    <div>
-      <div class="option-label">日本語ファイル名を英語に変換</div>
-      <div class="option-desc">日本語・記号を含む場合、タイムスタンプIDに変換します</div>
-    </div>
+    <label class="toggle"><input type="checkbox" id="opt-rename" checked><div class="toggle-slider"></div></label>
+    <div><div class="option-label">日本語ファイル名を英語に変換</div><div class="option-desc">日本語・記号含む場合タイムスタンプIDに変換</div></div>
   </div>
   <div class="option-row">
-    <label class="toggle">
-      <input type="checkbox" id="opt-remove-lights" checked>
-      <div class="toggle-slider"></div>
-    </label>
-    <div>
-      <div class="option-label">GLB内のライトを削除</div>
-      <div class="option-desc">Point / Spot / Directional ライトをすべて除去します</div>
-    </div>
+    <label class="toggle"><input type="checkbox" id="opt-lights" checked><div class="toggle-slider"></div></label>
+    <div><div class="option-label">GLB内のライトを削除</div><div class="option-desc">Point / Spot / Directional をすべて除去</div></div>
   </div>
 </div>
 
@@ -433,13 +139,13 @@
   <input type="file" id="file-input" accept=".glb" multiple>
 </div>
 
-<!-- File Queue -->
+<!-- Queue -->
 <div class="card" id="queue-card" style="display:none">
   <div class="card-title">📋 アップロードキュー</div>
   <div id="file-queue"></div>
 </div>
 
-<!-- Upload Button -->
+<!-- Upload btn -->
 <div class="card" id="upload-section">
   <div class="btn-row">
     <button class="btn secondary" onclick="clearQueue()">クリア</button>
@@ -453,390 +159,207 @@
   <div id="log-content"></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script>
-// ===== CONFIG =====
+// CONFIG
 function saveConfig() {
-  const url = document.getElementById('supabase-url').value.trim();
-  const key = document.getElementById('supabase-key').value.trim();
-  const bucket = document.getElementById('supabase-bucket').value.trim();
-  if (!url || !key) { alert('URLとキーを入力してください'); return; }
-  localStorage.setItem('sb_url', url);
-  localStorage.setItem('sb_key', key);
-  localStorage.setItem('sb_bucket', bucket || 'glb-models');
-  document.getElementById('config-saved').style.display = 'block';
-  setTimeout(() => document.getElementById('config-saved').style.display = 'none', 2000);
+  const u = document.getElementById('supabase-url').value.trim();
+  const k = document.getElementById('supabase-key').value.trim();
+  if (!u || !k) { alert('URLとキーを入力してください'); return; }
+  localStorage.setItem('sb_url', u);
+  localStorage.setItem('sb_key', k);
+  localStorage.setItem('sb_bucket', document.getElementById('supabase-bucket').value.trim() || 'glb-models');
+  localStorage.setItem('viewer_url', document.getElementById('viewer-url').value.trim());
+  const msg = document.getElementById('config-saved');
+  msg.style.display = 'block';
+  document.getElementById('config-card').style.borderColor = 'rgba(102,187,106,0.3)';
+  setTimeout(() => msg.style.display = 'none', 2000);
 }
-
 function loadConfig() {
-  const url = localStorage.getItem('sb_url') || '';
-  const key = localStorage.getItem('sb_key') || '';
-  const bucket = localStorage.getItem('sb_bucket') || 'glb-models';
-  document.getElementById('supabase-url').value = url;
-  document.getElementById('supabase-key').value = key;
-  document.getElementById('supabase-bucket').value = bucket;
-  if (url && key) {
+  document.getElementById('supabase-url').value  = localStorage.getItem('sb_url') || '';
+  document.getElementById('supabase-key').value  = localStorage.getItem('sb_key') || '';
+  document.getElementById('supabase-bucket').value = localStorage.getItem('sb_bucket') || 'glb-models';
+  document.getElementById('viewer-url').value    = localStorage.getItem('viewer_url') || '';
+  if (localStorage.getItem('sb_url') && localStorage.getItem('sb_key'))
     document.getElementById('config-card').style.borderColor = 'rgba(102,187,106,0.3)';
-  }
 }
 
-// ===== FILE RENAME =====
-function toSafeFilename(name) {
-  // Remove extension
-  const ext = name.lastIndexOf('.') > 0 ? name.slice(name.lastIndexOf('.')) : '.glb';
-  const base = name.slice(0, name.lastIndexOf('.') > 0 ? name.lastIndexOf('.') : name.length);
-
-  // Check if has non-ASCII characters
-  const hasNonAscii = /[^\x00-\x7F]/.test(base);
-  const hasSpecial = /[^a-zA-Z0-9_\-]/.test(base);
-
-  if (!hasNonAscii && !hasSpecial) return name;
-
-  // Replace non-ASCII with nothing, keep ASCII alphanumeric
-  let ascii = base.replace(/[^\x00-\x7F]/g, '').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-
-  // If nothing left, generate timestamp ID
-  if (!ascii) {
-    const ts = Date.now().toString(36).toUpperCase();
-    ascii = 'model_' + ts;
-  } else {
-    ascii = ascii + '_' + Date.now().toString(36).toUpperCase();
-  }
-
-  return ascii + ext;
+// RENAME
+function toSafe(name) {
+  const dot  = name.lastIndexOf('.');
+  const ext  = dot > 0 ? name.slice(dot) : '.glb';
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  if (!/[^\x00-\x7F]/.test(base) && !/[^a-zA-Z0-9_\-]/.test(base)) return name;
+  let a = base.replace(/[^\x00-\x7F]/g,'').replace(/[^a-zA-Z0-9_\-]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
+  if (!a) a = 'model';
+  return a + '_' + Date.now().toString(36).toUpperCase() + ext;
 }
 
-// ===== GLB LIGHT REMOVAL =====
-async function removeLightsFromGLB(arrayBuffer) {
-  const view = new DataView(arrayBuffer);
-
-  // Validate GLB magic: 0x46546C67
-  const magic = view.getUint32(0, true);
-  if (magic !== 0x46546C67) throw new Error('GLBファイルではありません');
-
-  const version = view.getUint32(4, true);
-  // const totalLength = view.getUint32(8, true);
-
-  // Parse chunks
-  let offset = 12;
-  let jsonChunkOffset = -1;
-  let jsonChunkLength = 0;
-  let binChunkOffset = -1;
-  let binChunkLength = 0;
-
-  while (offset < arrayBuffer.byteLength) {
-    const chunkLen = view.getUint32(offset, true);
-    const chunkType = view.getUint32(offset + 4, true);
-    if (chunkType === 0x4E4F534A) { // JSON
-      jsonChunkOffset = offset + 8;
-      jsonChunkLength = chunkLen;
-    } else if (chunkType === 0x004E4942) { // BIN
-      binChunkOffset = offset;
-      binChunkLength = chunkLen;
-    }
-    offset += 8 + chunkLen;
+// LIGHT REMOVAL
+async function removeLights(buf) {
+  const v = new DataView(buf);
+  if (v.getUint32(0, true) !== 0x46546C67) throw new Error('GLBファイルではありません');
+  const ver = v.getUint32(4, true);
+  let off = 12, jOff = -1, jLen = 0, bOff = -1, bLen = 0;
+  while (off < buf.byteLength) {
+    const cLen = v.getUint32(off, true), cType = v.getUint32(off+4, true);
+    if (cType === 0x4E4F534A) { jOff = off+8; jLen = cLen; }
+    else if (cType === 0x004E4942) { bOff = off; bLen = cLen; }
+    off += 8 + cLen;
   }
-
-  if (jsonChunkOffset < 0) throw new Error('JSONチャンクが見つかりません');
-
-  // Parse JSON
-  const jsonBytes = new Uint8Array(arrayBuffer, jsonChunkOffset, jsonChunkLength);
-  const jsonStr = new TextDecoder().decode(jsonBytes);
-  const gltf = JSON.parse(jsonStr);
-
-  let lightsRemoved = 0;
-
-  // 1. Remove KHR_lights_punctual extension from top-level
-  if (gltf.extensions && gltf.extensions.KHR_lights_punctual) {
-    lightsRemoved += (gltf.extensions.KHR_lights_punctual.lights || []).length;
-    delete gltf.extensions.KHR_lights_punctual;
-    if (Object.keys(gltf.extensions).length === 0) delete gltf.extensions;
-  }
-
-  // 2. Remove from extensionsUsed / extensionsRequired
-  ['extensionsUsed', 'extensionsRequired'].forEach(key => {
-    if (gltf[key]) {
-      gltf[key] = gltf[key].filter(e => e !== 'KHR_lights_punctual');
-      if (gltf[key].length === 0) delete gltf[key];
-    }
-  });
-
-  // 3. Remove light references from nodes
-  if (gltf.nodes) {
-    gltf.nodes.forEach(node => {
-      if (node.extensions && node.extensions.KHR_lights_punctual) {
-        delete node.extensions.KHR_lights_punctual;
-        lightsRemoved++;
-        if (Object.keys(node.extensions).length === 0) delete node.extensions;
-      }
-    });
-  }
-
-  // Re-encode JSON (pad to 4-byte boundary with spaces)
-  let newJsonStr = JSON.stringify(gltf);
-  while (newJsonStr.length % 4 !== 0) newJsonStr += ' ';
-  const newJsonBytes = new TextEncoder().encode(newJsonStr);
-
-  // Rebuild GLB
-  const newJsonChunkLen = newJsonBytes.length;
-  let totalLen = 12 + 8 + newJsonChunkLen; // header + JSON chunk header + JSON data
-  if (binChunkOffset >= 0) totalLen += 8 + binChunkLength; // BIN chunk
-
-  const outBuffer = new ArrayBuffer(totalLen);
-  const outView = new DataView(outBuffer);
-  const outBytes = new Uint8Array(outBuffer);
-
-  // Header
-  outView.setUint32(0, 0x46546C67, true); // magic
-  outView.setUint32(4, version, true);
-  outView.setUint32(8, totalLen, true);
-
-  // JSON chunk
-  outView.setUint32(12, newJsonChunkLen, true);
-  outView.setUint32(16, 0x4E4F534A, true); // JSON
-  outBytes.set(newJsonBytes, 20);
-
-  // BIN chunk (copy as-is)
-  if (binChunkOffset >= 0) {
-    const binStart = 20 + newJsonChunkLen;
-    outView.setUint32(binStart, binChunkLength, true);
-    outView.setUint32(binStart + 4, 0x004E4942, true); // BIN
-    const srcBin = new Uint8Array(arrayBuffer, binChunkOffset + 8, binChunkLength);
-    outBytes.set(srcBin, binStart + 8);
-  }
-
-  return { buffer: outBuffer, lightsRemoved };
+  if (jOff < 0) throw new Error('JSONチャンクなし');
+  const g = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, jOff, jLen)));
+  let n = 0;
+  if (g.extensions?.KHR_lights_punctual) { n += (g.extensions.KHR_lights_punctual.lights||[]).length; delete g.extensions.KHR_lights_punctual; if (!Object.keys(g.extensions).length) delete g.extensions; }
+  ['extensionsUsed','extensionsRequired'].forEach(k => { if(g[k]){g[k]=g[k].filter(e=>e!=='KHR_lights_punctual'); if(!g[k].length)delete g[k];} });
+  (g.nodes||[]).forEach(nd => { if(nd.extensions?.KHR_lights_punctual){n++;delete nd.extensions.KHR_lights_punctual;if(!Object.keys(nd.extensions).length)delete nd.extensions;} });
+  let js = JSON.stringify(g); while(js.length%4) js+=' ';
+  const jb = new TextEncoder().encode(js);
+  const tot = 12+8+jb.length+(bOff>=0?8+bLen:0);
+  const ob = new ArrayBuffer(tot); const ov = new DataView(ob); const oa = new Uint8Array(ob);
+  ov.setUint32(0,0x46546C67,true); ov.setUint32(4,ver,true); ov.setUint32(8,tot,true);
+  ov.setUint32(12,jb.length,true); ov.setUint32(16,0x4E4F534A,true); oa.set(jb,20);
+  if (bOff>=0) { const bs=20+jb.length; ov.setUint32(bs,bLen,true); ov.setUint32(bs+4,0x004E4942,true); oa.set(new Uint8Array(buf,bOff+8,bLen),bs+8); }
+  return { buffer: ob, count: n };
 }
 
-// ===== FILE QUEUE =====
-let fileQueue = []; // { file, newName, status, url }
-
+// QUEUE
+let queue = [];
 function addFiles(files) {
-  const rename = document.getElementById('opt-rename').checked;
-
-  Array.from(files).forEach(file => {
-    if (!file.name.toLowerCase().endsWith('.glb')) {
-      log(`スキップ: ${file.name}（GLBファイルではありません）`, 'err');
-      return;
-    }
-    const newName = rename ? toSafeFilename(file.name) : file.name;
-    fileQueue.push({ file, newName, status: 'pending', url: null, id: Math.random().toString(36).slice(2) });
+  const doRename = document.getElementById('opt-rename').checked;
+  Array.from(files).forEach(f => {
+    if (!f.name.toLowerCase().endsWith('.glb')) { addLog(`スキップ: ${f.name}`, 'err'); return; }
+    queue.push({ file: f, newName: doRename ? toSafe(f.name) : f.name, status: 'pending', id: Math.random().toString(36).slice(2) });
   });
-
   renderQueue();
 }
-
 function renderQueue() {
-  const container = document.getElementById('file-queue');
-  const card = document.getElementById('queue-card');
-  const uploadSection = document.getElementById('upload-section');
-
-  if (fileQueue.length === 0) {
-    card.style.display = 'none';
-    uploadSection.style.display = 'none';
-    return;
-  }
-
-  card.style.display = 'block';
-  uploadSection.style.display = 'block';
-
-  container.innerHTML = '';
-  fileQueue.forEach((item, i) => {
-    const nameChanged = item.newName !== item.file.name;
-    const div = document.createElement('div');
-    div.className = 'file-item';
-    div.id = 'file-item-' + item.id;
-    div.innerHTML = `
+  const qc = document.getElementById('queue-card'), qf = document.getElementById('file-queue'), us = document.getElementById('upload-section');
+  if (!queue.length) { qc.style.display='none'; us.style.display='none'; return; }
+  qc.style.display='block'; us.classList.add('visible');
+  qf.innerHTML = '';
+  queue.forEach((item, i) => {
+    const changed = item.newName !== item.file.name;
+    const d = document.createElement('div');
+    d.className = 'file-item'; d.id = 'fi-'+item.id;
+    d.innerHTML = `
       <div class="file-icon">📦</div>
       <div class="file-info">
-        <div class="file-orig">${escHtml(item.file.name)}</div>
-        <div class="file-new">${escHtml(item.newName)}${nameChanged ? ' <span style="color:var(--warn);font-size:10px">✦ 変換</span>' : ''}</div>
-        <div class="file-size">${(item.file.size / 1024 / 1024).toFixed(1)} MB</div>
-        <div class="progress-wrap" id="prog-${item.id}"><div class="progress-bar" id="bar-${item.id}"></div></div>
-        <div class="result-url" id="url-wrap-${item.id}">
-          <div class="url-row">
-            <div class="url-text" id="url-text-${item.id}"></div>
-            <button class="copy-btn" id="copy-${item.id}" onclick="copyUrl('${item.id}')">コピー</button>
-          </div>
+        <div class="file-orig">${esc(item.file.name)}</div>
+        <div class="file-new">${esc(item.newName)}${changed?` <span style="color:var(--warn);font-size:10px">✦変換</span>`:''}
         </div>
+        <div class="file-size">${(item.file.size/1024/1024).toFixed(1)} MB</div>
+        <div class="progress-wrap" id="pw-${item.id}"><div class="progress-bar" id="pb-${item.id}"></div></div>
+        <div class="result-section" id="rs-${item.id}"></div>
       </div>
-      <span class="file-status pending" id="status-${item.id}">待機中</span>
-      ${item.status === 'pending' ? `<button class="file-remove" onclick="removeFile(${i})">✕</button>` : ''}
+      <span class="file-status pending" id="st-${item.id}">待機中</span>
+      ${item.status==='pending'?`<button class="file-remove" onclick="removeFile(${i})">✕</button>`:''}
     `;
-    container.appendChild(div);
+    qf.appendChild(d);
   });
 }
+function removeFile(i) { queue.splice(i,1); renderQueue(); }
+function clearQueue() { queue = queue.filter(f=>f.status!=='pending'); if(queue.every(f=>f.status!=='pending'))queue=[]; renderQueue(); }
 
-function removeFile(i) {
-  fileQueue.splice(i, 1);
-  renderQueue();
-}
-
-function clearQueue() {
-  fileQueue = fileQueue.filter(f => f.status !== 'pending');
-  if (fileQueue.every(f => f.status === 'done' || f.status === 'error')) fileQueue = [];
-  renderQueue();
-}
-
-// ===== UPLOAD =====
+// UPLOAD
 async function uploadAll() {
-  const sbUrl = localStorage.getItem('sb_url');
-  const sbKey = localStorage.getItem('sb_key');
+  const sbUrl    = localStorage.getItem('sb_url');
+  const sbKey    = localStorage.getItem('sb_key');
   const sbBucket = localStorage.getItem('sb_bucket') || 'glb-models';
-
-  if (!sbUrl || !sbKey) {
-    alert('先にSupabaseの設定を保存してください');
-    return;
-  }
+  const viewerBase = (localStorage.getItem('viewer_url')||'').replace(/\/?$/,'/');
+  if (!sbUrl||!sbKey) { alert('先に設定を保存してください'); return; }
 
   const btn = document.getElementById('btn-upload');
-  btn.disabled = true;
-  btn.textContent = 'アップロード中...';
+  btn.disabled=true; btn.textContent='アップロード中...';
   document.getElementById('log-area').classList.add('visible');
 
-  const removeLights = document.getElementById('opt-remove-lights').checked;
+  const doLights = document.getElementById('opt-lights').checked;
 
-  for (const item of fileQueue) {
+  for (const item of queue) {
     if (item.status !== 'pending') continue;
-
-    setStatus(item.id, 'processing', '処理中...');
-    showProgress(item.id, true);
-    setProgress(item.id, 10);
-
-    log(`処理中: ${item.file.name} → ${item.newName}`, 'info');
-
+    setSt(item.id,'processing','処理中...');
+    showPw(item.id,true); setPb(item.id,10);
+    addLog(`処理中: ${item.file.name} → ${item.newName}`,'info');
     try {
-      // Read file
-      let arrayBuffer = await item.file.arrayBuffer();
-      setProgress(item.id, 30);
-
-      // Remove lights
-      if (removeLights) {
-        log(`  ライト削除中...`, 'info');
+      let buf = await item.file.arrayBuffer();
+      setPb(item.id,30);
+      if (doLights) {
         try {
-          const result = await removeLightsFromGLB(arrayBuffer);
-          arrayBuffer = result.buffer;
-          if (result.lightsRemoved > 0) {
-            log(`  ライト ${result.lightsRemoved} 個を削除しました`, 'ok');
-          } else {
-            log(`  ライトなし（スキップ）`, 'info');
-          }
-        } catch(e) {
-          log(`  ライト削除エラー（元ファイルを使用）: ${e.message}`, 'err');
-        }
+          const r = await removeLights(buf);
+          buf = r.buffer;
+          addLog(`  ライト ${r.count} 個削除`, r.count>0?'ok':'info');
+        } catch(e) { addLog(`  ライト削除エラー: ${e.message}`,'err'); }
       }
-
-      setProgress(item.id, 60);
-
-      // Upload to Supabase
-      const blob = new Blob([arrayBuffer], { type: 'model/gltf-binary' });
-      const uploadUrl = `${sbUrl}/storage/v1/object/${sbBucket}/${encodeURIComponent(item.newName)}`;
-
-      const res = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${sbKey}`,
-          'Content-Type': 'model/gltf-binary',
-          'x-upsert': 'true'
-        },
-        body: blob
+      setPb(item.id,60);
+      const res = await fetch(`${sbUrl}/storage/v1/object/${sbBucket}/${encodeURIComponent(item.newName)}`,{
+        method:'POST',
+        headers:{'Authorization':`Bearer ${sbKey}`,'Content-Type':'model/gltf-binary','x-upsert':'true'},
+        body: new Blob([buf],{type:'model/gltf-binary'})
       });
+      setPb(item.id,90);
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
 
-      setProgress(item.id, 90);
+      const glbUrl    = `${sbUrl}/storage/v1/object/public/${sbBucket}/${encodeURIComponent(item.newName)}`;
+      const viewerUrl = viewerBase ? `${viewerBase}?glb=${encodeURIComponent(glbUrl)}` : glbUrl;
 
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`HTTP ${res.status}: ${errText}`);
-      }
-
-      // Public URL
-      const publicUrl = `${sbUrl}/storage/v1/object/public/${sbBucket}/${encodeURIComponent(item.newName)}`;
-      item.status = 'done';
-      item.url = publicUrl;
-      setProgress(item.id, 100);
-      setStatus(item.id, 'done', '完了 ✓');
-      showResultUrl(item.id, publicUrl);
-      log(`  ✓ 完了: ${publicUrl}`, 'ok');
-
+      item.status='done'; setPb(item.id,100); setSt(item.id,'done','完了 ✓');
+      showResult(item.id, glbUrl, viewerUrl);
+      addLog('  ✓ 完了','ok');
     } catch(e) {
-      item.status = 'error';
-      setStatus(item.id, 'error', 'エラー');
-      log(`  ✗ エラー: ${e.message}`, 'err');
+      item.status='error'; setSt(item.id,'error','エラー');
+      addLog(`  ✗ ${e.message}`,'err');
     }
   }
-
-  btn.disabled = false;
-  btn.textContent = 'アップロード開始 →';
-  log('--- 完了 ---', 'info');
+  btn.disabled=false; btn.textContent='アップロード開始 →';
+  addLog('--- 完了 ---','info');
 }
 
-// ===== UI HELPERS =====
-function setStatus(id, cls, text) {
-  const el = document.getElementById('status-' + id);
-  if (el) { el.className = 'file-status ' + cls; el.textContent = text; }
+// RESULT + QR
+function showResult(id, glbUrl, viewerUrl) {
+  const sec = document.getElementById('rs-'+id);
+  if (!sec) return;
+  sec.innerHTML = `
+    <div class="result-label">GLB直接URL</div>
+    <div class="url-row">
+      <div class="url-text" id="gu-${id}">${esc(glbUrl)}</div>
+      <button class="copy-btn" id="cgb-${id}" onclick="doCopy('gu-${id}','cgb-${id}')">コピー</button>
+    </div>
+    <div class="result-label">🔗 ビューアーURL（これをQRに使用）</div>
+    <div class="url-row">
+      <div class="url-text viewer" id="vu-${id}">${esc(viewerUrl)}</div>
+      <button class="copy-btn" id="cvb-${id}" onclick="doCopy('vu-${id}','cvb-${id}')">コピー</button>
+    </div>
+    <div class="qr-wrap">
+      <canvas id="qrc-${id}"></canvas>
+      <div class="qr-info">
+        <div class="qr-title">📱 QRコード</div>
+        <div class="qr-hint">スキャンするとビューアーで<br>このGLBが開きます</div>
+      </div>
+    </div>
+  `;
+  sec.classList.add('visible');
+  QRCode.toCanvas(document.getElementById('qrc-'+id), viewerUrl, { width:120, margin:1, color:{dark:'#000',light:'#fff'} });
 }
 
-function showProgress(id, show) {
-  const el = document.getElementById('prog-' + id);
-  if (el) el.classList.toggle('visible', show);
+// HELPERS
+function setSt(id,cls,txt){const e=document.getElementById('st-'+id);if(e){e.className='file-status '+cls;e.textContent=txt;}}
+function showPw(id,v){const e=document.getElementById('pw-'+id);if(e)e.classList.toggle('visible',v);}
+function setPb(id,p){const e=document.getElementById('pb-'+id);if(e)e.style.width=p+'%';}
+function doCopy(textId,btnId){
+  const t=document.getElementById(textId)?.textContent||'';
+  const b=document.getElementById(btnId);
+  navigator.clipboard.writeText(t).then(()=>{if(b){b.textContent='✓ コピー済み';b.classList.add('copied');setTimeout(()=>{b.textContent='コピー';b.classList.remove('copied');},2000);}});
 }
+function addLog(msg,type='info'){const e=document.getElementById('log-content');const d=document.createElement('div');d.className='log-'+type;d.textContent=msg;e.appendChild(d);e.scrollTop=e.scrollHeight;}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
-function setProgress(id, pct) {
-  const el = document.getElementById('bar-' + id);
-  if (el) el.style.width = pct + '%';
-}
+// DRAG & DROP
+const dz=document.getElementById('drop-zone'),fi=document.getElementById('file-input');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');addFiles(e.dataTransfer.files);});
+fi.addEventListener('change',e=>{addFiles(e.target.files);e.target.value='';});
 
-function showResultUrl(id, url) {
-  const wrap = document.getElementById('url-wrap-' + id);
-  const text = document.getElementById('url-text-' + id);
-  if (wrap && text) {
-    text.textContent = url;
-    wrap.classList.add('visible');
-  }
-}
-
-function copyUrl(id) {
-  const text = document.getElementById('url-text-' + id);
-  const btn = document.getElementById('copy-' + id);
-  if (text) {
-    navigator.clipboard.writeText(text.textContent).then(() => {
-      btn.textContent = '✓ コピー済み';
-      btn.classList.add('copied');
-      setTimeout(() => { btn.textContent = 'コピー'; btn.classList.remove('copied'); }, 2000);
-    });
-  }
-}
-
-function log(msg, type = 'info') {
-  const el = document.getElementById('log-content');
-  const line = document.createElement('div');
-  line.className = 'log-' + type;
-  line.textContent = msg;
-  el.appendChild(line);
-  el.scrollTop = el.scrollHeight;
-}
-
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ===== DRAG & DROP =====
-const dropZone = document.getElementById('drop-zone');
-const fileInput = document.getElementById('file-input');
-
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('drag-over');
-  addFiles(e.dataTransfer.files);
-});
-
-fileInput.addEventListener('change', e => {
-  addFiles(e.target.files);
-  e.target.value = '';
-});
-
-// ===== INIT =====
 loadConfig();
 </script>
 </body>
