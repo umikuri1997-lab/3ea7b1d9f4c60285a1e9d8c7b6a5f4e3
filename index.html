@@ -240,25 +240,43 @@ const pmremGenerator = new THREE.PMREMGenerator(renderer);
 pmremGenerator.compileEquirectangularShader();
 
 let currentEnvMap = null;
-let hdrBgEnabled = false;
+let hdrBgEnabled = true;
 let activeHdrIdx = -1;
+let HDR_PRESETS = [];
 
-const HDR_PRESETS = [
-  { label: 'スタジオ（明るい）', color: '#d4e8f0', url: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_09_1k.hdr' },
-  { label: '夕方・屋外',         color: '#f0a860', url: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/evening_road_01_1k.hdr' },
-  { label: '白い部屋',           color: '#e8e8e0', url: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/small_empty_room_3_1k.hdr' },
-  { label: '曇り空',             color: '#9ab0c0', url: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/overcast_soil_puresky_1k.hdr' },
-  { label: '青空',               color: '#5090d0', url: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_48d_partly_cloudy_puresky_1k.hdr' },
-];
-
-function buildHDRPanel() {
+async function buildHDRPanel() {
   const container = document.getElementById('hdr-presets');
+  container.innerHTML = '<div style="padding:8px 12px;font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted)">読み込み中...</div>';
+
+  try {
+    // GitHub APIでhdrフォルダのファイル一覧を取得
+    // URLからオーナーとリポジトリ名を抽出
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    const repoName = pathParts[0] || '';
+    const owner = window.location.hostname.split('.')[0];
+    const apiUrl = `https://api.github.com/repos/${owner}/${repoName}/contents/hdr`;
+
+    const res = await fetch(apiUrl);
+    if (!res.ok) throw new Error('API error');
+    const files = await res.json();
+
+    HDR_PRESETS = files
+      .filter(f => f.name.toLowerCase().endsWith('.hdr'))
+      .map(f => ({ file: f.name, label: f.name }));
+
+    if (!HDR_PRESETS.length) throw new Error('HDRファイルなし');
+
+  } catch(e) {
+    container.innerHTML = '<div style="padding:8px 12px;font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted)">hdr/ フォルダにHDRファイルを追加してください</div>';
+    return;
+  }
+
   container.innerHTML = '';
   HDR_PRESETS.forEach((p, i) => {
     const btn = document.createElement('button');
     btn.className = 'hdr-preset-btn';
     btn.id = 'hdr-btn-' + i;
-    btn.innerHTML = `<span class="hdr-dot" style="background:${p.color};border:1px solid rgba(255,255,255,0.15)"></span>${p.label}`;
+    btn.textContent = p.file;
     btn.onclick = () => loadHDR(i);
     container.appendChild(btn);
   });
@@ -266,11 +284,11 @@ function buildHDRPanel() {
 
 function loadHDR(idx) {
   const preset = HDR_PRESETS[idx];
-  // Update active button
+  if (!preset) return;
   document.querySelectorAll('.hdr-preset-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
   activeHdrIdx = idx;
-
-  rgbeLoader.load(preset.url, (texture) => {
+  const url = './hdr/' + preset.file;
+  rgbeLoader.load(url, (texture) => {
     if (currentEnvMap) currentEnvMap.dispose();
     currentEnvMap = pmremGenerator.fromEquirectangular(texture).texture;
     texture.dispose();
@@ -280,7 +298,7 @@ function loadHDR(idx) {
       scene.backgroundIntensity = 500;
     }
   }, undefined, () => {
-    console.warn('HDR読み込み失敗:', preset.url);
+    console.warn('HDR読み込み失敗:', url);
   });
 }
 
@@ -484,8 +502,17 @@ window.toggleQR = async function() {
   qrVisible = !qrVisible;
   const wrap = document.getElementById('qr-wrap');
   if (qrVisible) {
-    await loadQRLib(); updateQR(); wrap.style.display = 'block';
-  } else { wrap.style.display = 'none'; }
+    wrap.style.display = 'block'; // 先に表示してからcanvasサイズを確保
+    await loadQRLib();
+    // 既存canvasをクリアして新規生成
+    const oldCanvas = document.getElementById('qr-canvas');
+    const newCanvas = document.createElement('canvas');
+    newCanvas.id = 'qr-canvas';
+    oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+    QRCode.toCanvas(newCanvas, window.location.href, { width: 120, margin: 1, color: { dark: '#000', light: '#fff' } });
+  } else {
+    wrap.style.display = 'none';
+  }
 };
 function updateQR() {
   if (!qrVisible || !window.QRCode) return;
@@ -532,7 +559,7 @@ function animate(time) {
 }
 
 // ===== INIT =====
-buildHDRPanel();
+buildHDRPanel(); // async、エラーは内部で処理
 animate(0);
 
 // Auto-load from URL
