@@ -178,6 +178,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 // ===== RENDERER =====
 const container = document.getElementById('canvas-container');
@@ -228,6 +229,10 @@ scene.add(hemiLight);
 const rgbeLoader = new RGBELoader();
 const pmremGenerator = new THREE.PMREMGenerator(renderer);
 pmremGenerator.compileEquirectangularShader();
+
+// HDRがない場合でもメタリックが黒くならないようニュートラル環境マップを設定
+const neutralEnv = pmremGenerator.fromScene(new THREE.RoomEnvironment()).texture;
+scene.environment = neutralEnv;
 
 let currentEnvMap = null;
 let hdrBgEnabled = true;
