@@ -133,7 +133,7 @@
         <div class="hdr-toggle-row">
           <span class="hdr-toggle-label">背景に表示</span>
           <label class="mini-toggle">
-            <input type="checkbox" id="hdr-bg-toggle" onchange="toggleHDRBackground()">
+            <input type="checkbox" id="hdr-bg-toggle" checked onchange="toggleHDRBackground()">
             <div class="mini-slider"></div>
           </label>
         </div>
@@ -275,7 +275,10 @@ function loadHDR(idx) {
     currentEnvMap = pmremGenerator.fromEquirectangular(texture).texture;
     texture.dispose();
     scene.environment = currentEnvMap;
-    if (hdrBgEnabled) scene.background = currentEnvMap;
+    if (hdrBgEnabled) {
+      scene.background = currentEnvMap;
+      scene.backgroundIntensity = 500;
+    }
   }, undefined, () => {
     console.warn('HDR読み込み失敗:', preset.url);
   });
@@ -285,9 +288,11 @@ window.toggleHDRBackground = function() {
   hdrBgEnabled = document.getElementById('hdr-bg-toggle').checked;
   if (hdrBgEnabled && currentEnvMap) {
     scene.background = currentEnvMap;
+    scene.backgroundIntensity = 500;
     scene.fog = null;
   } else {
     scene.background = new THREE.Color(0x0a0a0b);
+    scene.backgroundIntensity = 1;
     if (loadedModel) scene.fog = new THREE.Fog(0x0a0a0b, 30, 120);
   }
 };
