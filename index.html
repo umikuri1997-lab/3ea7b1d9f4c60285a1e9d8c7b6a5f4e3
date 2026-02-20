@@ -72,6 +72,14 @@
   #controls-hint{padding:14px 20px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);line-height:1.9;}
   .hint-key{display:inline-block;background:var(--border);padding:1px 5px;font-size:9px;color:var(--text);}
 
+  /* Slider rows */
+  .slider-row{display:flex;align-items:center;gap:6px;padding:5px 16px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);}
+  .slider-row label{width:62px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .slider-row input[type="range"]{flex:1;height:3px;-webkit-appearance:none;appearance:none;background:var(--border);outline:none;border-radius:2px;cursor:pointer;}
+  .slider-row input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent);cursor:pointer;}
+  .slider-row input[type="range"]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;}
+  .slider-val{width:34px;text-align:right;font-size:10px;color:var(--text);flex-shrink:0;}
+
   /* Center overlay */
   #overlay-msg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:all;}
   .msg-box{background:rgba(10,10,11,0.92);border:1px solid var(--border);padding:40px 48px;text-align:center;max-width:480px;width:90%;backdrop-filter:blur(20px);}
@@ -136,6 +144,53 @@
           </label>
         </div>
         <div class="hdr-presets" id="hdr-presets"></div>
+      </div>
+    </div>
+
+    <!-- Lighting adjust -->
+    <div class="panel-section">
+      <div class="panel-header" onclick="toggleSection(this)">
+        <span>💡 ライティング調整</span><span class="arrow">▾</span>
+      </div>
+      <div class="panel-body" id="light-body">
+        <div class="slider-row">
+          <label>露出</label>
+          <input type="range" min="0.1" max="3" step="0.05" value="0.95" id="sl-exposure" oninput="updateLighting()">
+          <span class="slider-val" id="sv-exposure">0.95</span>
+        </div>
+        <div class="slider-row">
+          <label>直射光</label>
+          <input type="range" min="0" max="6" step="0.1" value="2.0" id="sl-dir" oninput="updateLighting()">
+          <span class="slider-val" id="sv-dir">2.0</span>
+        </div>
+        <div class="slider-row">
+          <label>環境光</label>
+          <input type="range" min="0" max="1" step="0.01" value="0.15" id="sl-amb" oninput="updateLighting()">
+          <span class="slider-val" id="sv-amb">0.15</span>
+        </div>
+        <div class="slider-row">
+          <label>半球光</label>
+          <input type="range" min="0" max="1" step="0.01" value="0.1" id="sl-hemi" oninput="updateLighting()">
+          <span class="slider-val" id="sv-hemi">0.10</span>
+        </div>
+        <div class="slider-row">
+          <label>反射強度</label>
+          <input type="range" min="0" max="4" step="0.1" value="1.2" id="sl-envmap" oninput="updateLighting()">
+          <span class="slider-val" id="sv-envmap">1.2</span>
+        </div>
+        <div class="slider-row">
+          <label>Bloom 強度</label>
+          <input type="range" min="0" max="0.5" step="0.01" value="0.06" id="sl-bloom-str" oninput="updateLighting()">
+          <span class="slider-val" id="sv-bloom-str">0.06</span>
+        </div>
+        <div class="slider-row">
+          <label>Bloom 閾値</label>
+          <input type="range" min="0" max="1.5" step="0.01" value="0.9" id="sl-bloom-th" oninput="updateLighting()">
+          <span class="slider-val" id="sv-bloom-th">0.90</span>
+        </div>
+        <div style="padding:4px 16px 12px">
+          <button class="btn secondary" style="width:100%;padding:6px;font-size:10px" onclick="resetLighting()">リセット</button>
+        </div>
       </div>
     </div>
 
@@ -611,6 +666,57 @@ window.closeLoadDialog = function() {
   if (loadedModel) {
     document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
   }
+};
+
+// ===== LIGHTING ADJUST =====
+const LIGHT_DEFAULTS = {exposure:0.95, dir:2.0, amb:0.15, hemi:0.1, envmap:1.2, bloomStr:0.06, bloomTh:0.9};
+
+window.updateLighting = function() {
+  const v = (id) => parseFloat(document.getElementById(id).value);
+  const exposure = v('sl-exposure');
+  const dir = v('sl-dir');
+  const amb = v('sl-amb');
+  const hemi = v('sl-hemi');
+  const env = v('sl-envmap');
+  const bStr = v('sl-bloom-str');
+  const bTh = v('sl-bloom-th');
+
+  renderer.toneMappingExposure = exposure;
+  dirLight.intensity = dir;
+  ambient.intensity = amb;
+  hemiLight.intensity = hemi;
+  bloomPass.strength = bStr;
+  bloomPass.threshold = bTh;
+
+  // envMapIntensityは全メッシュに適用
+  if (loadedModel) {
+    loadedModel.traverse(obj => {
+      if (obj.isMesh) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach(m => { if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) m.envMapIntensity = env; });
+      }
+    });
+  }
+
+  document.getElementById('sv-exposure').textContent = exposure.toFixed(2);
+  document.getElementById('sv-dir').textContent = dir.toFixed(1);
+  document.getElementById('sv-amb').textContent = amb.toFixed(2);
+  document.getElementById('sv-hemi').textContent = hemi.toFixed(2);
+  document.getElementById('sv-envmap').textContent = env.toFixed(1);
+  document.getElementById('sv-bloom-str').textContent = bStr.toFixed(2);
+  document.getElementById('sv-bloom-th').textContent = bTh.toFixed(2);
+};
+
+window.resetLighting = function() {
+  const d = LIGHT_DEFAULTS;
+  document.getElementById('sl-exposure').value = d.exposure;
+  document.getElementById('sl-dir').value = d.dir;
+  document.getElementById('sl-amb').value = d.amb;
+  document.getElementById('sl-hemi').value = d.hemi;
+  document.getElementById('sl-envmap').value = d.envmap;
+  document.getElementById('sl-bloom-str').value = d.bloomStr;
+  document.getElementById('sl-bloom-th').value = d.bloomTh;
+  updateLighting();
 };
 
 // ===== RESIZE =====
