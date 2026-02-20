@@ -13,7 +13,7 @@
   *{margin:0;padding:0;box-sizing:border-box;}
   body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;overflow:hidden;height:100vh;width:100vw;}
   #canvas-container{position:fixed;inset:0;z-index:0;}
-  canvas{display:block;}
+  canvas{display:block;touch-action:none;}
 
   #ui{position:fixed;inset:0;z-index:10;pointer-events:none;}
 
@@ -145,7 +145,11 @@
         <span class="hint-key">W A S D</span> 移動<br>
         <span class="hint-key">Mouse</span> 視点<br>
         <span class="hint-key">Space</span> 上昇 &nbsp;<span class="hint-key">Shift</span> 下降<br>
-        <span class="hint-key">Esc</span> 解放
+        <span class="hint-key">Esc</span> 解放<br>
+        <br>
+        <span style="color:var(--accent)">📱 モバイル</span><br>
+        左半分ドラッグ → 移動<br>
+        右半分ドラッグ → 視点
       </div>
     </div>
   </div>
@@ -159,6 +163,7 @@
         <div class="input-hint">💡 アップローダーで生成されたURLを貼り付けてください</div>
       </div>
       <button class="btn" onclick="loadFromInput()" style="width:100%;padding:12px">GLBを読み込む →</button>
+      <button class="btn secondary" id="btn-close-overlay" onclick="closeLoadDialog()" style="width:100%;padding:10px;margin-top:8px;display:none">✕ 閉じる</button>
     </div>
     <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
   </div>
@@ -220,7 +225,7 @@ const outputPass = new OutputPass();
 composer.addPass(outputPass);
 
 // ===== LIGHTING =====
-const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+const ambient = new THREE.AmbientLight(0xffffff, 0.15);
 scene.add(ambient);
 
 const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
@@ -239,7 +244,7 @@ dirLight.shadow.bias           = -0.0005;
 dirLight.shadow.normalBias     = 0.02;
 scene.add(dirLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x888866, 0.3);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x888866, 0.1);
 scene.add(hemiLight);
 
 // ===== HDR =====
@@ -252,12 +257,11 @@ pmremGenerator.compileEquirectangularShader();
   const c = document.createElement('canvas');
   c.width = 128; c.height = 64;
   const ctx = c.getContext('2d');
-  // より明るいグラデーションで反射のコントラストを確保
   const g = ctx.createLinearGradient(0, 0, 0, 64);
-  g.addColorStop(0, '#dde4f0');
-  g.addColorStop(0.4, '#c8cfe0');
-  g.addColorStop(0.5, '#b0b8c8');
-  g.addColorStop(1, '#6a7080');
+  g.addColorStop(0, '#a0a8b8');
+  g.addColorStop(0.4, '#8890a0');
+  g.addColorStop(0.5, '#707888');
+  g.addColorStop(1, '#404550');
   ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 64);
   const tex = new THREE.CanvasTexture(c);
   tex.mapping = THREE.EquirectangularReflectionMapping;
@@ -389,7 +393,7 @@ function loadGLB(url, displayUrl) {
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         mats.forEach(mat => {
           if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
-            mat.envMapIntensity = 1.4;
+            mat.envMapIntensity = 1.2;
             mat.needsUpdate = true;
           }
         });
@@ -430,7 +434,7 @@ function loadGLB(url, displayUrl) {
     overlay.style.display = 'none';
     loadBar.style.display = 'none';
     document.getElementById('btn-reload').style.display = '';
-    document.getElementById('lock-msg').style.display = 'block';
+    document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
     const parts = (displayUrl || url).split('/');
     document.getElementById('model-name').textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb');
     activeCamIdx = -1; activeCamera = walkCamera;
@@ -489,7 +493,7 @@ const keys = {};
 const moveSpeed = 0.1;
 
 renderer.domElement.addEventListener('click', () => {
-  if (activeCamIdx !== -1 || !loadedModel) return;
+  if (activeCamIdx !== -1 || !loadedModel || isMobile) return;
   renderer.domElement.requestPointerLock();
 });
 document.addEventListener('pointerlockchange', () => {
@@ -506,6 +510,60 @@ document.addEventListener('mousemove', e => {
 document.addEventListener('keydown', e => { keys[e.code] = true; });
 document.addEventListener('keyup', e => { keys[e.code] = false; });
 
+// ===== TOUCH CONTROLS (モバイル) =====
+let touchLookId = null, touchMoveId = null;
+let touchLookStart = {x:0, y:0};
+let touchMoveStart = {x:0, y:0};
+let touchMoveVec = {x:0, z:0};
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+renderer.domElement.addEventListener('touchstart', e => {
+  if (activeCamIdx !== -1 || !loadedModel) return;
+  for (const touch of e.changedTouches) {
+    if (touch.clientX > window.innerWidth * 0.4 && touchLookId === null) {
+      // 右半分 → 視点操作
+      touchLookId = touch.identifier;
+      touchLookStart = {x: touch.clientX, y: touch.clientY};
+    } else if (touch.clientX <= window.innerWidth * 0.4 && touchMoveId === null) {
+      // 左半分 → 移動
+      touchMoveId = touch.identifier;
+      touchMoveStart = {x: touch.clientX, y: touch.clientY};
+      touchMoveVec = {x:0, z:0};
+    }
+  }
+}, {passive:true});
+
+renderer.domElement.addEventListener('touchmove', e => {
+  for (const touch of e.changedTouches) {
+    if (touch.identifier === touchLookId) {
+      const dx = touch.clientX - touchLookStart.x;
+      const dy = touch.clientY - touchLookStart.y;
+      yaw -= dx * 0.003;
+      pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitch - dy * 0.003));
+      touchLookStart = {x: touch.clientX, y: touch.clientY};
+    }
+    if (touch.identifier === touchMoveId) {
+      const dx = touch.clientX - touchMoveStart.x;
+      const dy = touch.clientY - touchMoveStart.y;
+      const len = Math.sqrt(dx*dx + dy*dy);
+      if (len > 5) {
+        touchMoveVec = {x: dx / len, z: dy / len};
+      } else {
+        touchMoveVec = {x:0, z:0};
+      }
+    }
+  }
+}, {passive:true});
+
+const touchEnd = e => {
+  for (const touch of e.changedTouches) {
+    if (touch.identifier === touchLookId) touchLookId = null;
+    if (touch.identifier === touchMoveId) { touchMoveId = null; touchMoveVec = {x:0, z:0}; }
+  }
+};
+renderer.domElement.addEventListener('touchend', touchEnd, {passive:true});
+renderer.domElement.addEventListener('touchcancel', touchEnd, {passive:true});
+
 const euler = new THREE.Euler(0, 0, 0, 'YXZ');
 const moveDir = new THREE.Vector3();
 function updateWalk() {
@@ -518,6 +576,11 @@ function updateWalk() {
   if (keys['KeyD']||keys['ArrowRight']) moveDir.x += 1;
   if (keys['Space'])                     moveDir.y += 1;
   if (keys['ShiftLeft']||keys['ShiftRight']) moveDir.y -= 1;
+  // タッチ移動を加算
+  if (touchMoveVec.x !== 0 || touchMoveVec.z !== 0) {
+    moveDir.x += touchMoveVec.x;
+    moveDir.z += touchMoveVec.z;
+  }
   if (moveDir.length() > 0) {
     moveDir.normalize().multiplyScalar(moveSpeed).applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)));
     walkCamera.position.add(moveDir);
@@ -540,6 +603,14 @@ window.toggleSection = function(header) {
 window.showLoadDialog = function() {
   document.getElementById('overlay-msg').style.display = 'flex';
   document.getElementById('lock-msg').style.display = 'none';
+  // モデル読み込み済みなら閉じるボタンを表示
+  document.getElementById('btn-close-overlay').style.display = loadedModel ? '' : 'none';
+};
+window.closeLoadDialog = function() {
+  document.getElementById('overlay-msg').style.display = 'none';
+  if (loadedModel) {
+    document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
+  }
 };
 
 // ===== RESIZE =====
