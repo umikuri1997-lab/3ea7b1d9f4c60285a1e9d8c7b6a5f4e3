@@ -14,28 +14,49 @@
     --font:'Noto Sans JP',sans-serif;--mono:'JetBrains Mono',monospace;--r:10px;
   }
   *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:40px 20px 60px;}
-  .page-title{font-size:22px;font-weight:500;letter-spacing:2px;margin-bottom:6px;}
-  .page-title span{color:var(--accent);}
-  .page-sub{font-size:12px;color:var(--muted);margin-bottom:32px;}
-  .card{width:100%;max-width:560px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;margin-bottom:16px;}
-  .card-title{font-size:11px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
-  .field{margin-bottom:12px;}
-  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
-  .field input{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:border-color 0.2s;}
-  .field input:focus{border-color:var(--accent);}
-  .field input::placeholder{color:rgba(255,255,255,0.2);}
-  .btn{width:100%;padding:11px;background:var(--accent);border:none;border-radius:7px;color:#000;font-size:13px;font-weight:500;font-family:var(--font);cursor:pointer;transition:opacity 0.2s;}
-  .btn:hover{opacity:0.85;}.btn:disabled{opacity:0.4;cursor:not-allowed;}
-  .btn.secondary{background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
-  .btn.secondary:hover{color:var(--text);border-color:rgba(255,255,255,0.15);}
-  .config-saved{font-size:11px;color:var(--success);margin-top:8px;display:none;}
-  #drop-zone{border:2px dashed rgba(255,255,255,0.1);border-radius:var(--r);padding:48px 24px;text-align:center;cursor:pointer;transition:all 0.25s;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:0 0 60px;}
+
+  /* ===== HEADER ===== */
+  #header {
+    width:100%;background:var(--surface);border-bottom:1px solid var(--border);
+    display:flex;align-items:center;padding:14px 20px;gap:12px;position:sticky;top:0;z-index:100;
+  }
+  #header .title{font-size:16px;font-weight:500;letter-spacing:1px;flex:1;}
+  #header .title span{color:var(--accent);}
+  .icon-btn{width:36px;height:36px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all 0.2s;flex-shrink:0;}
+  .icon-btn:hover{color:var(--text);border-color:rgba(255,255,255,0.2);}
+
+  /* ===== SETTINGS DRAWER ===== */
+  #drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:none;backdrop-filter:blur(4px);}
+  #drawer-overlay.open{display:block;}
+  #settings-drawer{
+    position:fixed;top:0;right:0;height:100vh;width:340px;max-width:90vw;
+    background:var(--surface);border-left:1px solid var(--border);z-index:300;
+    transform:translateX(100%);transition:transform 0.3s cubic-bezier(0.16,1,0.3,1);
+    display:flex;flex-direction:column;overflow-y:auto;
+  }
+  #settings-drawer.open{transform:translateX(0);}
+  .drawer-header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border);}
+  .drawer-header h2{font-size:14px;font-weight:500;letter-spacing:1px;}
+  .drawer-section{padding:20px;}
+  .drawer-section+.drawer-section{border-top:1px solid var(--border);}
+  .section-title{font-size:10px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+
+  /* ===== MAIN CONTENT ===== */
+  #main{width:100%;max-width:560px;padding:24px 20px;}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px;}
+  .card-title{font-size:11px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+
+  /* Drop zone */
+  #drop-zone{border:2px dashed rgba(255,255,255,0.1);border-radius:var(--r);padding:52px 24px;text-align:center;cursor:pointer;transition:all 0.25s;}
   #drop-zone:hover,#drop-zone.drag-over{border-color:var(--accent);background:var(--accent-dim);}
-  #drop-zone .drop-icon{font-size:40px;margin-bottom:12px;opacity:0.5;}
-  #drop-zone p{font-size:14px;color:var(--muted);margin-bottom:4px;}
+  #drop-zone .drop-icon{font-size:44px;margin-bottom:14px;opacity:0.5;}
+  #drop-zone p{font-size:15px;color:var(--muted);margin-bottom:4px;}
   #drop-zone .hint{font-size:11px;color:rgba(255,255,255,0.2);}
   #file-input{display:none;}
+
+  /* File queue */
   #file-queue{display:flex;flex-direction:column;gap:8px;}
   .file-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px;}
   .file-icon{font-size:20px;flex-shrink:0;margin-top:2px;}
@@ -64,9 +85,35 @@
   .copy-btn.copied{color:var(--success);border-color:var(--success);}
   .qr-wrap{display:flex;align-items:flex-start;gap:14px;margin-top:10px;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--border);}
   .qr-wrap canvas{flex-shrink:0;border-radius:4px;}
-  .qr-info{flex:1;}
-  .qr-title{font-size:12px;color:var(--accent);margin-bottom:5px;font-weight:500;}
-  .qr-hint{font-size:11px;color:var(--muted);line-height:1.7;}
+  .qr-info .qr-title{font-size:12px;color:var(--accent);margin-bottom:5px;font-weight:500;}
+  .qr-info .qr-hint{font-size:11px;color:var(--muted);line-height:1.7;}
+
+  /* Upload btn */
+  #upload-section{display:none;}
+  #upload-section.visible{display:block;}
+  .btn-row{display:flex;gap:8px;}
+  .btn{width:100%;padding:11px;background:var(--accent);border:none;border-radius:7px;color:#000;font-size:13px;font-weight:500;font-family:var(--font);cursor:pointer;transition:opacity 0.2s;}
+  .btn:hover{opacity:0.85;}.btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn.secondary{background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
+  .btn.secondary:hover{color:var(--text);border-color:rgba(255,255,255,0.2);}
+  .btn-row .btn{flex:1;}
+
+  /* Log */
+  #log-area{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;display:none;}
+  #log-area.visible{display:block;}
+  #log-content{font-family:var(--mono);font-size:11px;color:var(--muted);max-height:140px;overflow-y:auto;line-height:1.8;}
+  .log-ok{color:var(--success);}.log-err{color:var(--danger);}.log-info{color:var(--accent);}
+
+  /* Drawer form elements */
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
+  .field input{width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:border-color 0.2s;}
+  .field input:focus{border-color:var(--accent);}
+  .field input::placeholder{color:rgba(255,255,255,0.2);}
+  .drawer-btn{width:100%;padding:10px;background:var(--accent);border:none;border-radius:7px;color:#000;font-size:13px;font-weight:500;font-family:var(--font);cursor:pointer;transition:opacity 0.2s;margin-top:4px;}
+  .drawer-btn:hover{opacity:0.85;}
+  .config-saved{font-size:11px;color:var(--success);margin-top:8px;display:none;text-align:center;}
+
   .option-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
   .option-row:last-child{border-bottom:none;}
   .toggle{position:relative;width:36px;height:20px;flex-shrink:0;}
@@ -76,178 +123,182 @@
   .toggle input:checked+.toggle-slider{background:var(--accent);}
   .toggle input:checked+.toggle-slider::before{transform:translateX(16px);}
   .option-label{flex:1;font-size:13px;}
-  .option-desc{font-size:11px;color:var(--muted);}
-  #upload-section{display:none;}
-  #upload-section.visible{display:block;}
-  .btn-row{display:flex;gap:8px;}
-  .btn-row .btn{flex:1;}
-  #log-area{width:100%;max-width:560px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;display:none;}
-  #log-area.visible{display:block;}
-  #log-content{font-family:var(--mono);font-size:11px;color:var(--muted);max-height:160px;overflow-y:auto;line-height:1.8;}
-  .log-ok{color:var(--success);}.log-err{color:var(--danger);}.log-info{color:var(--accent);}
+  .option-desc{font-size:10px;color:var(--muted);}
 </style>
 </head>
 <body>
 
-<div class="page-title">GLB <span>Upload</span></div>
-<div class="page-sub">日本語ファイル名変換 ・ ライト削除 ・ ビューアURL & QR自動生成</div>
-
-<!-- Config -->
-<div class="card" id="config-card">
-  <div class="card-title">⚙️ 設定（初回のみ）</div>
-  <div class="field">
-    <label>Supabase Project URL</label>
-    <input type="text" id="supabase-url" placeholder="https://xxxxxxxxxxxx.supabase.co" />
-  </div>
-  <div class="field">
-    <label>Service Role Key</label>
-    <input type="password" id="supabase-key" placeholder="eyJhbGciOiJIUzI1NiIs..." />
-  </div>
-  <div class="field">
-    <label>バケット名</label>
-    <input type="text" id="supabase-bucket" value="glb-models" />
-  </div>
-  <div class="field">
-    <label>ビューアーURL（QRに使用）</label>
-    <input type="text" id="viewer-url" placeholder="https://umikuri1997-lab.github.io/3ea7b1d9f4c60285a1e9d8c7b6a5f4e3/" />
-  </div>
-  <button class="btn" onclick="saveConfig()">設定を保存</button>
-  <div class="config-saved" id="config-saved">✓ 設定を保存しました</div>
+<!-- Header -->
+<div id="header">
+  <div class="title">GLB <span>Upload</span></div>
+  <button class="icon-btn" onclick="openDrawer()" title="設定">⚙️</button>
 </div>
 
-<!-- Options -->
-<div class="card">
-  <div class="card-title">🔧 処理オプション</div>
-  <div class="option-row">
-    <label class="toggle"><input type="checkbox" id="opt-rename" checked><div class="toggle-slider"></div></label>
-    <div><div class="option-label">日本語ファイル名を英語に変換</div><div class="option-desc">日本語・記号含む場合タイムスタンプIDに変換</div></div>
+<!-- Settings Drawer -->
+<div id="drawer-overlay" onclick="closeDrawer()"></div>
+<div id="settings-drawer">
+  <div class="drawer-header">
+    <h2>設定</h2>
+    <button class="icon-btn" onclick="closeDrawer()">✕</button>
   </div>
-  <div class="option-row">
-    <label class="toggle"><input type="checkbox" id="opt-lights" checked><div class="toggle-slider"></div></label>
-    <div><div class="option-label">GLB内のライトを削除</div><div class="option-desc">Point / Spot / Directional をすべて除去</div></div>
+
+  <div class="drawer-section">
+    <div class="section-title">⚙️ Supabase（初回のみ）</div>
+    <div class="field">
+      <label>Project URL</label>
+      <input type="text" id="supabase-url" placeholder="https://xxxxxxxxxxxx.supabase.co" />
+    </div>
+    <div class="field">
+      <label>Service Role Key</label>
+      <input type="password" id="supabase-key" placeholder="eyJhbGciOiJIUzI1NiIs..." />
+    </div>
+    <div class="field">
+      <label>バケット名</label>
+      <input type="text" id="supabase-bucket" value="glb-models" />
+    </div>
+    <div class="field">
+      <label>ビューアーURL（QRに使用）</label>
+      <input type="text" id="viewer-url" placeholder="https://umikuri1997-lab.github.io/3ea7b1d9f4c60285a1e9d8c7b6a5f4e3/" />
+    </div>
+    <button class="drawer-btn" onclick="saveConfig()">設定を保存</button>
+    <div class="config-saved" id="config-saved">✓ 保存しました</div>
   </div>
-</div>
 
-<!-- Drop Zone -->
-<div class="card">
-  <div class="card-title">📁 GLBファイルを追加</div>
-  <div id="drop-zone" onclick="document.getElementById('file-input').click()">
-    <div class="drop-icon">📦</div>
-    <p>クリックまたはドラッグ＆ドロップ</p>
-    <div class="hint">.glb ファイル（複数可）</div>
-  </div>
-  <input type="file" id="file-input" accept=".glb" multiple>
-</div>
-
-<!-- Queue -->
-<div class="card" id="queue-card" style="display:none">
-  <div class="card-title">📋 アップロードキュー</div>
-  <div id="file-queue"></div>
-</div>
-
-<!-- Upload btn -->
-<div class="card" id="upload-section">
-  <div class="btn-row">
-    <button class="btn secondary" onclick="clearQueue()">クリア</button>
-    <button class="btn" id="btn-upload" onclick="uploadAll()">アップロード開始 →</button>
+  <div class="drawer-section">
+    <div class="section-title">🔧 処理オプション</div>
+    <div class="option-row">
+      <label class="toggle"><input type="checkbox" id="opt-rename" checked><div class="toggle-slider"></div></label>
+      <div><div class="option-label">日本語ファイル名を変換</div><div class="option-desc">日本語・記号含む場合タイムスタンプIDに変換</div></div>
+    </div>
+    <div class="option-row">
+      <label class="toggle"><input type="checkbox" id="opt-lights" checked><div class="toggle-slider"></div></label>
+      <div><div class="option-label">GLB内のライトを削除</div><div class="option-desc">Point / Spot / Directional をすべて除去</div></div>
+    </div>
   </div>
 </div>
 
-<!-- Log -->
-<div id="log-area">
-  <div class="card-title" style="margin-bottom:8px">📝 ログ</div>
-  <div id="log-content"></div>
+<!-- Main -->
+<div id="main">
+
+  <!-- Drop Zone (一番上) -->
+  <div class="card">
+    <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="drop-icon">📦</div>
+      <p>クリックまたはドラッグ＆ドロップ</p>
+      <div class="hint">.glb ファイル（複数可）</div>
+    </div>
+    <input type="file" id="file-input" accept=".glb" multiple>
+  </div>
+
+  <!-- Queue -->
+  <div class="card" id="queue-card" style="display:none">
+    <div class="card-title">📋 アップロードキュー</div>
+    <div id="file-queue"></div>
+  </div>
+
+  <!-- Upload btn -->
+  <div id="upload-section">
+    <div class="card">
+      <div class="btn-row">
+        <button class="btn secondary" onclick="clearQueue()">クリア</button>
+        <button class="btn" id="btn-upload" onclick="uploadAll()">アップロード開始 →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div id="log-area">
+    <div class="card-title" style="margin-bottom:8px">📝 ログ</div>
+    <div id="log-content"></div>
+  </div>
+
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script>
+// QR lib
+function loadQRLib(){return new Promise((res,rej)=>{if(window.QRCode){res();return;}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+loadQRLib().catch(()=>{});
+
+// DRAWER
+function openDrawer(){document.getElementById('settings-drawer').classList.add('open');document.getElementById('drawer-overlay').classList.add('open');}
+function closeDrawer(){document.getElementById('settings-drawer').classList.remove('open');document.getElementById('drawer-overlay').classList.remove('open');}
+
 // CONFIG
-function saveConfig() {
-  const u = document.getElementById('supabase-url').value.trim();
-  const k = document.getElementById('supabase-key').value.trim();
-  if (!u || !k) { alert('URLとキーを入力してください'); return; }
-  localStorage.setItem('sb_url', u);
-  localStorage.setItem('sb_key', k);
-  localStorage.setItem('sb_bucket', document.getElementById('supabase-bucket').value.trim() || 'glb-models');
-  localStorage.setItem('viewer_url', document.getElementById('viewer-url').value.trim());
-  const msg = document.getElementById('config-saved');
-  msg.style.display = 'block';
-  document.getElementById('config-card').style.borderColor = 'rgba(102,187,106,0.3)';
-  setTimeout(() => msg.style.display = 'none', 2000);
+function saveConfig(){
+  const u=document.getElementById('supabase-url').value.trim();
+  const k=document.getElementById('supabase-key').value.trim();
+  if(!u||!k){alert('URLとキーを入力してください');return;}
+  localStorage.setItem('sb_url',u);
+  localStorage.setItem('sb_key',k);
+  localStorage.setItem('sb_bucket',document.getElementById('supabase-bucket').value.trim()||'glb-models');
+  localStorage.setItem('viewer_url',document.getElementById('viewer-url').value.trim());
+  const m=document.getElementById('config-saved');m.style.display='block';
+  setTimeout(()=>m.style.display='none',2000);
 }
-function loadConfig() {
-  document.getElementById('supabase-url').value  = localStorage.getItem('sb_url') || '';
-  document.getElementById('supabase-key').value  = localStorage.getItem('sb_key') || '';
-  document.getElementById('supabase-bucket').value = localStorage.getItem('sb_bucket') || 'glb-models';
-  document.getElementById('viewer-url').value    = localStorage.getItem('viewer_url') || '';
-  if (localStorage.getItem('sb_url') && localStorage.getItem('sb_key'))
-    document.getElementById('config-card').style.borderColor = 'rgba(102,187,106,0.3)';
+function loadConfig(){
+  document.getElementById('supabase-url').value=localStorage.getItem('sb_url')||'';
+  document.getElementById('supabase-key').value=localStorage.getItem('sb_key')||'';
+  document.getElementById('supabase-bucket').value=localStorage.getItem('sb_bucket')||'glb-models';
+  document.getElementById('viewer-url').value=localStorage.getItem('viewer_url')||'';
 }
 
 // RENAME
-function toSafe(name) {
-  const dot  = name.lastIndexOf('.');
-  const ext  = dot > 0 ? name.slice(dot) : '.glb';
-  const base = dot > 0 ? name.slice(0, dot) : name;
-  if (!/[^\x00-\x7F]/.test(base) && !/[^a-zA-Z0-9_\-]/.test(base)) return name;
-  let a = base.replace(/[^\x00-\x7F]/g,'').replace(/[^a-zA-Z0-9_\-]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
-  if (!a) a = 'model';
-  return a + '_' + Date.now().toString(36).toUpperCase() + ext;
+function toSafe(name){
+  const dot=name.lastIndexOf('.');
+  const ext=dot>0?name.slice(dot):'.glb';
+  const base=dot>0?name.slice(0,dot):name;
+  if(!/[^\x00-\x7F]/.test(base)&&!/[^a-zA-Z0-9_\-]/.test(base))return name;
+  let a=base.replace(/[^\x00-\x7F]/g,'').replace(/[^a-zA-Z0-9_\-]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
+  if(!a)a='model';
+  return a+'_'+Date.now().toString(36).toUpperCase()+ext;
 }
 
 // LIGHT REMOVAL
-async function removeLights(buf) {
-  const v = new DataView(buf);
-  if (v.getUint32(0, true) !== 0x46546C67) throw new Error('GLBファイルではありません');
-  const ver = v.getUint32(4, true);
-  let off = 12, jOff = -1, jLen = 0, bOff = -1, bLen = 0;
-  while (off < buf.byteLength) {
-    const cLen = v.getUint32(off, true), cType = v.getUint32(off+4, true);
-    if (cType === 0x4E4F534A) { jOff = off+8; jLen = cLen; }
-    else if (cType === 0x004E4942) { bOff = off; bLen = cLen; }
-    off += 8 + cLen;
-  }
-  if (jOff < 0) throw new Error('JSONチャンクなし');
-  const g = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, jOff, jLen)));
-  let n = 0;
-  if (g.extensions?.KHR_lights_punctual) { n += (g.extensions.KHR_lights_punctual.lights||[]).length; delete g.extensions.KHR_lights_punctual; if (!Object.keys(g.extensions).length) delete g.extensions; }
-  ['extensionsUsed','extensionsRequired'].forEach(k => { if(g[k]){g[k]=g[k].filter(e=>e!=='KHR_lights_punctual'); if(!g[k].length)delete g[k];} });
-  (g.nodes||[]).forEach(nd => { if(nd.extensions?.KHR_lights_punctual){n++;delete nd.extensions.KHR_lights_punctual;if(!Object.keys(nd.extensions).length)delete nd.extensions;} });
-  let js = JSON.stringify(g); while(js.length%4) js+=' ';
-  const jb = new TextEncoder().encode(js);
-  const tot = 12+8+jb.length+(bOff>=0?8+bLen:0);
-  const ob = new ArrayBuffer(tot); const ov = new DataView(ob); const oa = new Uint8Array(ob);
-  ov.setUint32(0,0x46546C67,true); ov.setUint32(4,ver,true); ov.setUint32(8,tot,true);
-  ov.setUint32(12,jb.length,true); ov.setUint32(16,0x4E4F534A,true); oa.set(jb,20);
-  if (bOff>=0) { const bs=20+jb.length; ov.setUint32(bs,bLen,true); ov.setUint32(bs+4,0x004E4942,true); oa.set(new Uint8Array(buf,bOff+8,bLen),bs+8); }
-  return { buffer: ob, count: n };
+async function removeLights(buf){
+  const v=new DataView(buf);
+  if(v.getUint32(0,true)!==0x46546C67)throw new Error('GLBファイルではありません');
+  const ver=v.getUint32(4,true);
+  let off=12,jOff=-1,jLen=0,bOff=-1,bLen=0;
+  while(off<buf.byteLength){const cLen=v.getUint32(off,true),cType=v.getUint32(off+4,true);if(cType===0x4E4F534A){jOff=off+8;jLen=cLen;}else if(cType===0x004E4942){bOff=off;bLen=cLen;}off+=8+cLen;}
+  if(jOff<0)throw new Error('JSONチャンクなし');
+  const g=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,jOff,jLen)));
+  let n=0;
+  if(g.extensions?.KHR_lights_punctual){n+=(g.extensions.KHR_lights_punctual.lights||[]).length;delete g.extensions.KHR_lights_punctual;if(!Object.keys(g.extensions).length)delete g.extensions;}
+  ['extensionsUsed','extensionsRequired'].forEach(k=>{if(g[k]){g[k]=g[k].filter(e=>e!=='KHR_lights_punctual');if(!g[k].length)delete g[k];}});
+  (g.nodes||[]).forEach(nd=>{if(nd.extensions?.KHR_lights_punctual){n++;delete nd.extensions.KHR_lights_punctual;if(!Object.keys(nd.extensions).length)delete nd.extensions;}});
+  let js=JSON.stringify(g);while(js.length%4)js+=' ';
+  const jb=new TextEncoder().encode(js);
+  const tot=12+8+jb.length+(bOff>=0?8+bLen:0);
+  const ob=new ArrayBuffer(tot);const ov=new DataView(ob);const oa=new Uint8Array(ob);
+  ov.setUint32(0,0x46546C67,true);ov.setUint32(4,ver,true);ov.setUint32(8,tot,true);
+  ov.setUint32(12,jb.length,true);ov.setUint32(16,0x4E4F534A,true);oa.set(jb,20);
+  if(bOff>=0){const bs=20+jb.length;ov.setUint32(bs,bLen,true);ov.setUint32(bs+4,0x004E4942,true);oa.set(new Uint8Array(buf,bOff+8,bLen),bs+8);}
+  return{buffer:ob,count:n};
 }
 
 // QUEUE
-let queue = [];
-function addFiles(files) {
-  const doRename = document.getElementById('opt-rename').checked;
-  Array.from(files).forEach(f => {
-    if (!f.name.toLowerCase().endsWith('.glb')) { addLog(`スキップ: ${f.name}`, 'err'); return; }
-    queue.push({ file: f, newName: doRename ? toSafe(f.name) : f.name, status: 'pending', id: Math.random().toString(36).slice(2) });
+let queue=[];
+function addFiles(files){
+  const doRename=document.getElementById('opt-rename').checked;
+  Array.from(files).forEach(f=>{
+    if(!f.name.toLowerCase().endsWith('.glb')){addLog(`スキップ: ${f.name}`,'err');return;}
+    queue.push({file:f,newName:doRename?toSafe(f.name):f.name,status:'pending',id:Math.random().toString(36).slice(2)});
   });
   renderQueue();
 }
-function renderQueue() {
-  const qc = document.getElementById('queue-card'), qf = document.getElementById('file-queue'), us = document.getElementById('upload-section');
-  if (!queue.length) { qc.style.display='none'; us.style.display='none'; return; }
-  qc.style.display='block'; us.classList.add('visible');
-  qf.innerHTML = '';
-  queue.forEach((item, i) => {
-    const changed = item.newName !== item.file.name;
-    const d = document.createElement('div');
-    d.className = 'file-item'; d.id = 'fi-'+item.id;
-    d.innerHTML = `
+function renderQueue(){
+  const qc=document.getElementById('queue-card'),qf=document.getElementById('file-queue'),us=document.getElementById('upload-section');
+  if(!queue.length){qc.style.display='none';us.style.display='none';return;}
+  qc.style.display='block';us.classList.add('visible');
+  qf.innerHTML='';
+  queue.forEach((item,i)=>{
+    const changed=item.newName!==item.file.name;
+    const d=document.createElement('div');d.className='file-item';d.id='fi-'+item.id;
+    d.innerHTML=`
       <div class="file-icon">📦</div>
       <div class="file-info">
         <div class="file-orig">${esc(item.file.name)}</div>
-        <div class="file-new">${esc(item.newName)}${changed?` <span style="color:var(--warn);font-size:10px">✦変換</span>`:''}
-        </div>
+        <div class="file-new">${esc(item.newName)}${changed?` <span style="color:var(--warn);font-size:10px">✦変換</span>`:''}</div>
         <div class="file-size">${(item.file.size/1024/1024).toFixed(1)} MB</div>
         <div class="progress-wrap" id="pw-${item.id}"><div class="progress-bar" id="pb-${item.id}"></div></div>
         <div class="result-section" id="rs-${item.id}"></div>
@@ -258,87 +309,61 @@ function renderQueue() {
     qf.appendChild(d);
   });
 }
-function removeFile(i) { queue.splice(i,1); renderQueue(); }
-function clearQueue() { queue = queue.filter(f=>f.status!=='pending'); if(queue.every(f=>f.status!=='pending'))queue=[]; renderQueue(); }
+function removeFile(i){queue.splice(i,1);renderQueue();}
+function clearQueue(){queue=queue.filter(f=>f.status!=='pending');if(queue.every(f=>f.status!=='pending'))queue=[];renderQueue();}
 
 // UPLOAD
-async function uploadAll() {
-  const sbUrl    = localStorage.getItem('sb_url');
-  const sbKey    = localStorage.getItem('sb_key');
-  const sbBucket = localStorage.getItem('sb_bucket') || 'glb-models';
-  const viewerBase = (localStorage.getItem('viewer_url')||'').replace(/\/?$/,'/');
-  if (!sbUrl||!sbKey) { alert('先に設定を保存してください'); return; }
-
-  const btn = document.getElementById('btn-upload');
-  btn.disabled=true; btn.textContent='アップロード中...';
+async function uploadAll(){
+  const sbUrl=localStorage.getItem('sb_url');
+  const sbKey=localStorage.getItem('sb_key');
+  const sbBucket=localStorage.getItem('sb_bucket')||'glb-models';
+  const viewerBase=(localStorage.getItem('viewer_url')||'').replace(/\/?$/,'/');
+  if(!sbUrl||!sbKey){alert('右上の⚙️から設定を保存してください');return;}
+  const btn=document.getElementById('btn-upload');
+  btn.disabled=true;btn.textContent='アップロード中...';
   document.getElementById('log-area').classList.add('visible');
-
-  const doLights = document.getElementById('opt-lights').checked;
-
-  for (const item of queue) {
-    if (item.status !== 'pending') continue;
-    setSt(item.id,'processing','処理中...');
-    showPw(item.id,true); setPb(item.id,10);
+  const doLights=document.getElementById('opt-lights').checked;
+  for(const item of queue){
+    if(item.status!=='pending')continue;
+    setSt(item.id,'processing','処理中...');showPw(item.id,true);setPb(item.id,10);
     addLog(`処理中: ${item.file.name} → ${item.newName}`,'info');
-    try {
-      let buf = await item.file.arrayBuffer();
-      setPb(item.id,30);
-      if (doLights) {
-        try {
-          const r = await removeLights(buf);
-          buf = r.buffer;
-          addLog(`  ライト ${r.count} 個削除`, r.count>0?'ok':'info');
-        } catch(e) { addLog(`  ライト削除エラー: ${e.message}`,'err'); }
+    try{
+      let buf=await item.file.arrayBuffer();setPb(item.id,30);
+      if(doLights){
+        try{const r=await removeLights(buf);buf=r.buffer;addLog(`  ライト ${r.count} 個削除`,r.count>0?'ok':'info');}
+        catch(e){addLog(`  ライト削除エラー: ${e.message}`,'err');}
       }
       setPb(item.id,60);
-      const res = await fetch(`${sbUrl}/storage/v1/object/${sbBucket}/${encodeURIComponent(item.newName)}`,{
-        method:'POST',
-        headers:{'Authorization':`Bearer ${sbKey}`,'Content-Type':'model/gltf-binary','x-upsert':'true'},
-        body: new Blob([buf],{type:'model/gltf-binary'})
+      const res=await fetch(`${sbUrl}/storage/v1/object/${sbBucket}/${encodeURIComponent(item.newName)}`,{
+        method:'POST',headers:{'Authorization':`Bearer ${sbKey}`,'Content-Type':'model/gltf-binary','x-upsert':'true'},
+        body:new Blob([buf],{type:'model/gltf-binary'})
       });
       setPb(item.id,90);
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-
-      const glbUrl    = `${sbUrl}/storage/v1/object/public/${sbBucket}/${encodeURIComponent(item.newName)}`;
-      const viewerUrl = viewerBase ? `${viewerBase}?glb=${encodeURIComponent(glbUrl)}` : glbUrl;
-
-      item.status='done'; setPb(item.id,100); setSt(item.id,'done','完了 ✓');
-      showResult(item.id, glbUrl, viewerUrl);
+      if(!res.ok)throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+      const glbUrl=`${sbUrl}/storage/v1/object/public/${sbBucket}/${encodeURIComponent(item.newName)}`;
+      const viewerUrl=viewerBase?`${viewerBase}?glb=${encodeURIComponent(glbUrl)}`:glbUrl;
+      item.status='done';setPb(item.id,100);setSt(item.id,'done','完了 ✓');
+      await showResult(item.id,glbUrl,viewerUrl);
       addLog('  ✓ 完了','ok');
-    } catch(e) {
-      item.status='error'; setSt(item.id,'error','エラー');
-      addLog(`  ✗ ${e.message}`,'err');
-    }
+    }catch(e){item.status='error';setSt(item.id,'error','エラー');addLog(`  ✗ ${e.message}`,'err');}
   }
-  btn.disabled=false; btn.textContent='アップロード開始 →';
+  btn.disabled=false;btn.textContent='アップロード開始 →';
   addLog('--- 完了 ---','info');
 }
 
-// RESULT + QR
-function showResult(id, glbUrl, viewerUrl) {
-  const sec = document.getElementById('rs-'+id);
-  if (!sec) return;
-  sec.innerHTML = `
+// RESULT
+async function showResult(id,glbUrl,viewerUrl){
+  const sec=document.getElementById('rs-'+id);if(!sec)return;
+  sec.innerHTML=`
     <div class="result-label">GLB直接URL</div>
-    <div class="url-row">
-      <div class="url-text" id="gu-${id}">${esc(glbUrl)}</div>
-      <button class="copy-btn" id="cgb-${id}" onclick="doCopy('gu-${id}','cgb-${id}')">コピー</button>
-    </div>
-    <div class="result-label">🔗 ビューアーURL（これをQRに使用）</div>
-    <div class="url-row">
-      <div class="url-text viewer" id="vu-${id}">${esc(viewerUrl)}</div>
-      <button class="copy-btn" id="cvb-${id}" onclick="doCopy('vu-${id}','cvb-${id}')">コピー</button>
-    </div>
-    <div class="qr-wrap">
-      <canvas id="qrc-${id}"></canvas>
-      <div class="qr-info">
-        <div class="qr-title">📱 QRコード</div>
-        <div class="qr-hint">スキャンするとビューアーで<br>このGLBが開きます</div>
-      </div>
-    </div>
+    <div class="url-row"><div class="url-text" id="gu-${id}">${esc(glbUrl)}</div><button class="copy-btn" id="cgb-${id}" onclick="doCopy('gu-${id}','cgb-${id}')">コピー</button></div>
+    <div class="result-label">🔗 ビューアーURL</div>
+    <div class="url-row"><div class="url-text viewer" id="vu-${id}">${esc(viewerUrl)}</div><button class="copy-btn" id="cvb-${id}" onclick="doCopy('vu-${id}','cvb-${id}')">コピー</button></div>
+    <div class="qr-wrap"><canvas id="qrc-${id}"></canvas><div class="qr-info"><div class="qr-title">📱 QRコード</div><div class="qr-hint">スキャンするとビューアーで<br>このGLBが開きます</div></div></div>
   `;
   sec.classList.add('visible');
-  QRCode.toCanvas(document.getElementById('qrc-'+id), viewerUrl, { width:120, margin:1, color:{dark:'#000',light:'#fff'} });
+  try{await loadQRLib();QRCode.toCanvas(document.getElementById('qrc-'+id),viewerUrl,{width:120,margin:1,color:{dark:'#000',light:'#fff'}});}
+  catch(e){const c=document.getElementById('qrc-'+id);if(c)c.style.display='none';}
 }
 
 // HELPERS
