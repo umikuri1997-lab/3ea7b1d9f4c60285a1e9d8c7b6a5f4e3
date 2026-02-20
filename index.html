@@ -160,15 +160,15 @@
         <div class="slider-group-label">▸ トーンマッピング</div>
         <div class="slider-row">
           <label>露出</label>
-          <input type="range" min="0.1" max="3" step="0.05" value="0.95" id="sl-exposure" oninput="updateLighting()">
-          <span class="slider-val" id="sv-exposure">0.95</span>
+          <input type="range" min="0.1" max="3" step="0.05" value="1.0" id="sl-exposure" oninput="updateLighting()">
+          <span class="slider-val" id="sv-exposure">1.00</span>
         </div>
 
         <div class="slider-group-label">▸ 直射光 (Directional)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="8" step="0.1" value="2.0" id="sl-dir" oninput="updateLighting()">
-          <span class="slider-val" id="sv-dir">2.0</span>
+          <input type="range" min="0" max="8" step="0.1" value="3.0" id="sl-dir" oninput="updateLighting()">
+          <span class="slider-val" id="sv-dir">3.0</span>
         </div>
         <div class="slider-row">
           <label>色</label>
@@ -196,8 +196,8 @@
         <div class="slider-group-label">▸ 環境光 (Ambient)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="2" step="0.01" value="0.15" id="sl-amb" oninput="updateLighting()">
-          <span class="slider-val" id="sv-amb">0.15</span>
+          <input type="range" min="0" max="2" step="0.01" value="0.8" id="sl-amb" oninput="updateLighting()">
+          <span class="slider-val" id="sv-amb">0.80</span>
         </div>
         <div class="slider-row">
           <label>色</label>
@@ -208,8 +208,8 @@
         <div class="slider-group-label">▸ 半球光 (Hemisphere)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="2" step="0.01" value="0.1" id="sl-hemi" oninput="updateLighting()">
-          <span class="slider-val" id="sv-hemi">0.10</span>
+          <input type="range" min="0" max="2" step="0.01" value="0" id="sl-hemi" oninput="updateLighting()">
+          <span class="slider-val" id="sv-hemi">0.00</span>
         </div>
         <div class="slider-row">
           <label>天空色</label>
@@ -225,8 +225,8 @@
         <div class="slider-group-label">▸ マテリアル / ポスプロ</div>
         <div class="slider-row">
           <label>反射強度</label>
-          <input type="range" min="0" max="4" step="0.1" value="1.2" id="sl-envmap" oninput="updateLighting()">
-          <span class="slider-val" id="sv-envmap">1.2</span>
+          <input type="range" min="0" max="4" step="0.1" value="1.5" id="sl-envmap" oninput="updateLighting()">
+          <span class="slider-val" id="sv-envmap">1.5</span>
         </div>
         <div class="slider-row">
           <label>Bloom 強度</label>
@@ -303,7 +303,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.95;
+renderer.toneMappingExposure = 1.0;
 container.appendChild(renderer.domElement);
 
 // ===== SCENE =====
@@ -331,10 +331,10 @@ const outputPass = new OutputPass();
 composer.addPass(outputPass);
 
 // ===== LIGHTING =====
-const ambient = new THREE.AmbientLight(0xffffff, 0.15);
+const ambient = new THREE.AmbientLight(0xffffff, 0.8);
 scene.add(ambient);
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
+const dirLight = new THREE.DirectionalLight(0xffffff, 3.0);
 dirLight.position.set(15, 30, 15);
 dirLight.castShadow = true;
 // 高品質影の設定
@@ -350,7 +350,7 @@ dirLight.shadow.bias           = -0.0005;
 dirLight.shadow.normalBias     = 0.02;
 scene.add(dirLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.1);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0);
 scene.add(hemiLight);
 
 // ===== HDR =====
@@ -516,7 +516,7 @@ function loadGLB(url, displayUrl) {
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         mats.forEach(mat => {
           if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
-            mat.envMapIntensity = 1.2;
+            mat.envMapIntensity = 1.5;
             mat.needsUpdate = true;
           }
         });
@@ -745,10 +745,10 @@ window.closeLoadDialog = function() {
 
 // ===== LIGHTING ADJUST =====
 const LIGHT_DEFAULTS = {
-  exposure:0.95, dir:2.0, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
-  amb:0.15, ambColor:'#ffffff',
-  hemi:0.1, hemiSky:'#ffffff', hemiGnd:'#ffffff',
-  envmap:1.2, bloomStr:0.06, bloomTh:0.9
+  exposure:1.0, dir:3.0, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
+  amb:0.8, ambColor:'#ffffff',
+  hemi:0, hemiSky:'#ffffff', hemiGnd:'#ffffff',
+  envmap:1.5, bloomStr:0.06, bloomTh:0.9
 };
 let dirLightDist = 50; // モデル読み込み時に更新
 let dirLightCenter = new THREE.Vector3();
