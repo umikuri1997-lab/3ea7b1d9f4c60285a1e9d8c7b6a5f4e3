@@ -465,7 +465,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 0.003;
 container.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -480,13 +480,15 @@ let activeCamera = walkCamera;
 let glbCameras = [];
 let activeCamIdx = -1; // -1 = walk mode
 
-// Ambient light
-const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+// Lighting (viewer.htmlと同じ設定)
+const ambient = new THREE.AmbientLight(0xffffff, 500);
 scene.add(ambient);
-const dirLight = new THREE.DirectionalLight(0xfff5e0, 1.2);
+const dirLight = new THREE.DirectionalLight(0xffffff, 500);
 dirLight.position.set(10, 20, 10);
 dirLight.castShadow = true;
 scene.add(dirLight);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 100);
+scene.add(hemiLight);
 
 // ===== GLB LOADER =====
 const dracoLoader = new DRACOLoader();
@@ -500,17 +502,14 @@ function convertOneDriveUrl(url) {
   // Convert OneDrive share link to direct download if possible
   try {
     if (url.includes('1drv.ms') || url.includes('onedrive.live.com')) {
-      // Try to make it a download URL
       if (!url.includes('download')) {
         url = url.replace('redir?', 'download?').replace('view.aspx?', 'download.aspx?');
       }
     }
-    // SharePoint/OneDrive for Business
-    if (url.includes('sharepoint.com') && url.includes('?e=')) {
-      // Convert sharing link to direct download
-      const base64 = btoa(url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-      // Use the sharing link as-is — CORS may still block, handled below
-    }
+  } catch(e) {}
+  // 日本語などの非ASCII文字を含むURLをエンコード
+  try {
+    url = encodeURI(decodeURI(url));
   } catch(e) {}
   return url;
 }
@@ -677,7 +676,7 @@ window.switchCamera = function(idx) {
 let isLocked = false;
 let yaw = 0, pitch = 0;
 const keys = {};
-const moveSpeed = 0.05;
+const moveSpeed = 0.1;
 
 renderer.domElement.addEventListener('click', () => {
   if (activeCamIdx !== -1) return;
