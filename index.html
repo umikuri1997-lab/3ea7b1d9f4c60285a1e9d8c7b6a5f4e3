@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GLB Walkthrough Viewer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0b;
+    --surface: #111114;
+    --border: #1e1e24;
+    --accent: #c8ff00;
+    --accent2: #ff6b35;
+    --text: #e8e8e0;
+    --muted: #555560;
+    --panel-w: 280px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  #canvas-container {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+
+  canvas { display: block; }
+
+  /* ===== OVERLAY UI ===== */
+  #ui {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  /* Top bar */
+  #topbar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 52px;
+    background: linear-gradient(180deg, rgba(10,10,11,0.95) 0%, transparent 100%);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+    pointer-events: all;
+  }
+
+  #logo {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  #model-name {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Load button */
+  #btn-load-wrap {
+    pointer-events: all;
+  }
+
+  .btn {
+    background: var(--accent);
+    color: #0a0a0b;
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn.secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn.secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Left panel */
+  #panel-left {
+    position: absolute;
+    top: 52px;
+    left: 0;
+    bottom: 0;
+    width: var(--panel-w);
+    background: rgba(10,10,11,0.85);
+    backdrop-filter: blur(12px);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: all;
+  }
+  #panel-left.open { transform: translateX(0); }
+
+  .panel-header {
+    padding: 16px 20px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Camera list */
+  #camera-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  #camera-list::-webkit-scrollbar { width: 3px; }
+  #camera-list::-webkit-scrollbar-track { background: transparent; }
+  #camera-list::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .cam-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: background 0.1s;
+    border-left: 2px solid transparent;
+  }
+  .cam-item:hover { background: rgba(200,255,0,0.05); }
+  .cam-item.active {
+    border-left-color: var(--accent);
+    background: rgba(200,255,0,0.08);
+  }
+  .cam-icon {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .cam-item.active .cam-icon { border-color: var(--accent); }
+  .cam-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cam-walk {
+    border-top: 1px solid var(--border);
+    margin: 4px 0;
+  }
+
+  /* Controls hint */
+  #controls-hint {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.9;
+  }
+  .hint-key {
+    display: inline-block;
+    background: var(--border);
+    padding: 1px 5px;
+    font-size: 9px;
+    color: var(--text);
+  }
+
+  /* Panel toggle */
+  #panel-toggle {
+    position: absolute;
+    top: 52px;
+    left: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: none;
+    padding: 10px 8px;
+    cursor: pointer;
+    pointer-events: all;
+    z-index: 11;
+    transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    font-size: 14px;
+    line-height: 1;
+    color: var(--text);
+    font-family: monospace;
+  }
+  #panel-toggle.open { left: var(--panel-w); }
+
+  /* Bottom right: QR + info */
+  #bottom-right {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    pointer-events: all;
+  }
+
+  #qr-wrap {
+    background: #fff;
+    padding: 10px;
+    display: none;
+  }
+  #qr-wrap canvas { display: block; }
+
+  #qr-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Center overlay messages */
+  #overlay-msg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: all;
+  }
+
+  .msg-box {
+    background: rgba(10,10,11,0.92);
+    border: 1px solid var(--border);
+    padding: 40px 48px;
+    text-align: center;
+    max-width: 480px;
+    width: 90%;
+    backdrop-filter: blur(20px);
+  }
+
+  .msg-title {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+  .msg-title span { color: var(--accent); }
+
+  .msg-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+
+  .url-input-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .url-input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 10px 14px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .url-input:focus { border-color: var(--accent); }
+  .url-input::placeholder { color: var(--muted); }
+
+  .input-hint {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: left;
+    padding: 0 2px;
+  }
+
+  /* Loading */
+  #loading-bar-wrap {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--border);
+    display: none;
+  }
+  #loading-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.2s;
+  }
+
+  #lock-msg {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10,10,11,0.85);
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    pointer-events: none;
+    white-space: nowrap;
+    display: none;
+  }
+
+  /* Walk mode cursor */
+  body.walking { cursor: none; }
+
+  #crosshair {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    display: none;
+  }
+  #crosshair::before, #crosshair::after {
+    content: '';
+    position: absolute;
+    background: rgba(200,255,0,0.8);
+  }
+  #crosshair::before { width: 12px; height: 1px; top: 0; left: -6px; }
+  #crosshair::after  { width: 1px; height: 12px; top: -6px; left: 0; }
+
+  #fps-badge {
+    position: absolute;
+    top: 60px;
+    right: 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    :root { --panel-w: 240px; }
+    .msg-box { padding: 28px 24px; }
+    .msg-title { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<div id="ui">
+  <!-- Top bar -->
+  <div id="topbar">
+    <div id="logo">Walk<span style="color:var(--text)">View</span></div>
+    <div id="model-name">GLBファイルを読み込んでください</div>
+    <button class="btn secondary" id="btn-reload" style="display:none" onclick="showLoadDialog()">変更</button>
+  </div>
+
+  <!-- Panel toggle -->
+  <button id="panel-toggle" onclick="togglePanel()" title="カメラパネル">☰</button>
+
+  <!-- Left panel -->
+  <div id="panel-left">
+    <div class="panel-header">📷 カメラ / ビュー</div>
+    <div id="camera-list">
+      <div style="padding:20px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">
+        GLBを読み込むとカメラが表示されます
+      </div>
+    </div>
+    <div id="controls-hint">
+      <span class="hint-key">W A S D</span> 移動<br>
+      <span class="hint-key">Mouse</span> 視点<br>
+      <span class="hint-key">Space</span> 上昇 &nbsp; <span class="hint-key">Shift</span> 下降<br>
+      <span class="hint-key">Esc</span> 解放
+    </div>
+  </div>
+
+  <!-- Center overlay -->
+  <div id="overlay-msg">
+    <div class="msg-box">
+      <div class="msg-title">Walk<span>View</span></div>
+      <div class="msg-sub">GLBウォークスルービューア<br>OneDriveの共有リンクまたはURLを入力</div>
+      <div class="url-input-wrap">
+        <input class="url-input" id="glb-url-input" type="text"
+          placeholder="https://onedrive.live.com/download?..." />
+        <div class="input-hint">💡 OneDrive共有リンクをそのまま貼り付けOK。直接リンクはダウンロード用URLに変換されます。</div>
+      </div>
+      <button class="btn" onclick="loadFromInput()" style="width:100%;padding:12px">GLBを読み込む →</button>
+    </div>
+    <div id="loading-bar-wrap">
+      <div id="loading-bar"></div>
+    </div>
+  </div>
+
+  <!-- Crosshair (walk mode) -->
+  <div id="crosshair"></div>
+
+  <!-- Bottom right -->
+  <div id="bottom-right">
+    <div id="qr-wrap"><canvas id="qr-canvas"></canvas></div>
+    <div id="qr-toggle">
+      <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)" id="qr-label"></span>
+      <button class="btn secondary" id="btn-qr" onclick="toggleQR()" style="display:none">QR</button>
+    </div>
+  </div>
+
+  <!-- Lock hint -->
+  <div id="lock-msg">クリックして歩行モード開始 — Escで解放</div>
+
+  <!-- FPS counter -->
+  <div id="fps-badge"></div>
+</div>
+
+<!-- Three.js and loaders -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+// ===== SCENE SETUP =====
+const container = document.getElementById('canvas-container');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a0b);
+scene.fog = new THREE.Fog(0x0a0a0b, 30, 120);
+
+// Walk camera
+const walkCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 500);
+walkCamera.position.set(0, 1.6, 0);
+
+let activeCamera = walkCamera;
+let glbCameras = [];
+let activeCamIdx = -1; // -1 = walk mode
+
+// Ambient light
+const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambient);
+const dirLight = new THREE.DirectionalLight(0xfff5e0, 1.2);
+dirLight.position.set(10, 20, 10);
+dirLight.castShadow = true;
+scene.add(dirLight);
+
+// ===== GLB LOADER =====
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+const gltfLoader = new GLTFLoader();
+gltfLoader.setDRACOLoader(dracoLoader);
+
+let loadedModel = null;
+
+function convertOneDriveUrl(url) {
+  // Convert OneDrive share link to direct download if possible
+  try {
+    if (url.includes('1drv.ms') || url.includes('onedrive.live.com')) {
+      // Try to make it a download URL
+      if (!url.includes('download')) {
+        url = url.replace('redir?', 'download?').replace('view.aspx?', 'download.aspx?');
+      }
+    }
+    // SharePoint/OneDrive for Business
+    if (url.includes('sharepoint.com') && url.includes('?e=')) {
+      // Convert sharing link to direct download
+      const base64 = btoa(url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      // Use the sharing link as-is — CORS may still block, handled below
+    }
+  } catch(e) {}
+  return url;
+}
+
+window.loadFromInput = function() {
+  const raw = document.getElementById('glb-url-input').value.trim();
+  if (!raw) return;
+  const url = convertOneDriveUrl(raw);
+  loadGLB(url, raw);
+};
+
+function loadGLB(url, displayUrl) {
+  const overlay = document.getElementById('overlay-msg');
+  const loadBar = document.getElementById('loading-bar-wrap');
+  const loadBarInner = document.getElementById('loading-bar');
+  const modelName = document.getElementById('model-name');
+
+  // Show loading
+  loadBar.style.display = 'block';
+  loadBarInner.style.width = '5%';
+
+  // Update URL param
+  const newUrl = new URL(window.location.href);
+  newUrl.searchParams.set('glb', url);
+  window.history.replaceState({}, '', newUrl.toString());
+  updateQR();
+
+  gltfLoader.load(
+    url,
+    (gltf) => {
+      // Remove previous
+      if (loadedModel) scene.remove(loadedModel);
+      loadedModel = gltf.scene;
+
+      // Shadow & material
+      gltf.scene.traverse(obj => {
+        if (obj.isMesh) {
+          obj.castShadow = true;
+          obj.receiveShadow = true;
+        }
+      });
+
+      scene.add(gltf.scene);
+
+      // Extract cameras from GLB
+      glbCameras = [];
+      gltf.scene.traverse(obj => {
+        if (obj.isCamera) glbCameras.push(obj);
+      });
+      // Also check animations cameras
+      if (gltf.cameras && gltf.cameras.length > 0) {
+        gltf.cameras.forEach(c => {
+          if (!glbCameras.includes(c)) glbCameras.push(c);
+        });
+      }
+
+      // Fix camera aspect
+      glbCameras.forEach(cam => {
+        if (cam.isPerspectiveCamera) {
+          cam.aspect = window.innerWidth / window.innerHeight;
+          cam.updateProjectionMatrix();
+        }
+      });
+
+      // Center model + place walk camera
+      const box = new THREE.Box3().setFromObject(gltf.scene);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.z);
+
+      // Position walk camera at edge, eye height
+      const eyeHeight = size.y * 0.35 + box.min.y;
+      walkCamera.position.set(center.x + maxDim * 0.4, eyeHeight, center.z + maxDim * 0.4);
+      walkCamera.lookAt(center);
+      yaw = -Math.PI / 4;
+      pitch = 0;
+
+      // Build camera list UI
+      buildCameraList();
+
+      // Hide overlay
+      overlay.style.display = 'none';
+      loadBar.style.display = 'none';
+      document.getElementById('btn-reload').style.display = '';
+      document.getElementById('btn-qr').style.display = '';
+      document.getElementById('lock-msg').style.display = 'block';
+
+      // Display name
+      const parts = (displayUrl || url).split('/');
+      modelName.textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb');
+
+      activeCamIdx = -1;
+      activeCamera = walkCamera;
+    },
+    (progress) => {
+      if (progress.total > 0) {
+        const pct = (progress.loaded / progress.total * 100).toFixed(0);
+        loadBarInner.style.width = pct + '%';
+      }
+    },
+    (error) => {
+      loadBar.style.display = 'none';
+      loadBarInner.style.width = '0%';
+      console.error(error);
+      alert('読み込みエラー:\n' + error.message + '\n\nCORSエラーの場合、OneDriveの共有設定を「リンクを知っている全員」に変更してください。');
+    }
+  );
+}
+
+function buildCameraList() {
+  const list = document.getElementById('camera-list');
+  list.innerHTML = '';
+
+  // Walk mode entry
+  const walkItem = document.createElement('div');
+  walkItem.className = 'cam-item cam-walk active';
+  walkItem.dataset.idx = '-1';
+  walkItem.innerHTML = `<div class="cam-icon">🚶</div><div class="cam-label">ウォークスルー</div>`;
+  walkItem.onclick = () => switchCamera(-1);
+  list.appendChild(walkItem);
+
+  if (glbCameras.length === 0) {
+    const note = document.createElement('div');
+    note.style = 'padding:12px 20px;font-family:"DM Mono",monospace;font-size:10px;color:var(--muted)';
+    note.textContent = 'GLB内にカメラなし';
+    list.appendChild(note);
+  } else {
+    glbCameras.forEach((cam, i) => {
+      const item = document.createElement('div');
+      item.className = 'cam-item';
+      item.dataset.idx = i;
+      const label = cam.name || `Camera ${i + 1}`;
+      item.innerHTML = `<div class="cam-icon">📷</div><div class="cam-label">${label}</div>`;
+      item.onclick = () => switchCamera(i);
+      list.appendChild(item);
+    });
+  }
+}
+
+window.switchCamera = function(idx) {
+  activeCamIdx = idx;
+  if (idx === -1) {
+    activeCamera = walkCamera;
+    document.getElementById('lock-msg').style.display = 'block';
+  } else {
+    activeCamera = glbCameras[idx];
+    activeCamera.aspect = window.innerWidth / window.innerHeight;
+    activeCamera.updateProjectionMatrix();
+    document.getElementById('lock-msg').style.display = 'none';
+    // Exit pointer lock if active
+    if (document.pointerLockElement) document.exitPointerLock();
+    isLocked = false;
+    document.getElementById('crosshair').style.display = 'none';
+    document.body.classList.remove('walking');
+  }
+
+  // Update active state in list
+  document.querySelectorAll('.cam-item').forEach(el => {
+    el.classList.toggle('active', parseInt(el.dataset.idx) === idx);
+  });
+};
+
+// ===== WALK CONTROLS =====
+let isLocked = false;
+let yaw = 0, pitch = 0;
+const keys = {};
+const moveSpeed = 0.05;
+
+renderer.domElement.addEventListener('click', () => {
+  if (activeCamIdx !== -1) return;
+  if (!loadedModel) return;
+  renderer.domElement.requestPointerLock();
+});
+
+document.addEventListener('pointerlockchange', () => {
+  isLocked = !!document.pointerLockElement;
+  document.getElementById('crosshair').style.display = isLocked ? 'block' : 'none';
+  document.getElementById('lock-msg').style.display = isLocked ? 'none' : (loadedModel ? 'block' : 'none');
+  document.body.classList.toggle('walking', isLocked);
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isLocked) return;
+  yaw -= e.movementX * 0.002;
+  pitch -= e.movementY * 0.002;
+  pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, pitch));
+});
+
+document.addEventListener('keydown', e => { keys[e.code] = true; });
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+const moveDir = new THREE.Vector3();
+
+function updateWalk() {
+  if (activeCamIdx !== -1) return;
+  euler.set(pitch, yaw, 0);
+  walkCamera.quaternion.setFromEuler(euler);
+
+  moveDir.set(0, 0, 0);
+  if (keys['KeyW'] || keys['ArrowUp'])    moveDir.z -= 1;
+  if (keys['KeyS'] || keys['ArrowDown'])  moveDir.z += 1;
+  if (keys['KeyA'] || keys['ArrowLeft'])  moveDir.x -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) moveDir.x += 1;
+  if (keys['Space'])                       moveDir.y += 1;
+  if (keys['ShiftLeft'] || keys['ShiftRight']) moveDir.y -= 1;
+
+  if (moveDir.length() > 0) {
+    moveDir.normalize().multiplyScalar(moveSpeed);
+    moveDir.applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)));
+    walkCamera.position.add(moveDir);
+  }
+}
+
+// ===== QR CODE =====
+function loadQRLib() {
+  return new Promise((res) => {
+    if (window.QRCode) { res(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+    s.onload = res;
+    document.head.appendChild(s);
+  });
+}
+
+let qrVisible = false;
+window.toggleQR = async function() {
+  qrVisible = !qrVisible;
+  const wrap = document.getElementById('qr-wrap');
+  if (qrVisible) {
+    await loadQRLib();
+    updateQR();
+    wrap.style.display = 'block';
+  } else {
+    wrap.style.display = 'none';
+  }
+};
+
+function updateQR() {
+  if (!qrVisible || !window.QRCode) return;
+  const canvas = document.getElementById('qr-canvas');
+  QRCode.toCanvas(canvas, window.location.href, { width: 120, margin: 1, color: { dark: '#000', light: '#fff' } });
+}
+
+// ===== PANEL TOGGLE =====
+let panelOpen = false;
+window.togglePanel = function() {
+  panelOpen = !panelOpen;
+  document.getElementById('panel-left').classList.toggle('open', panelOpen);
+  document.getElementById('panel-toggle').classList.toggle('open', panelOpen);
+  document.getElementById('panel-toggle').textContent = panelOpen ? '✕' : '☰';
+};
+
+// ===== SHOW LOAD DIALOG =====
+window.showLoadDialog = function() {
+  document.getElementById('overlay-msg').style.display = 'flex';
+  document.getElementById('lock-msg').style.display = 'none';
+};
+
+// ===== RESIZE =====
+window.addEventListener('resize', () => {
+  walkCamera.aspect = window.innerWidth / window.innerHeight;
+  walkCamera.updateProjectionMatrix();
+  glbCameras.forEach(cam => {
+    if (cam.isPerspectiveCamera) {
+      cam.aspect = window.innerWidth / window.innerHeight;
+      cam.updateProjectionMatrix();
+    }
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ===== RENDER LOOP =====
+let lastTime = 0, frameCount = 0, fps = 0;
+function animate(time) {
+  requestAnimationFrame(animate);
+  updateWalk();
+  renderer.render(scene, activeCamera);
+
+  // FPS
+  frameCount++;
+  if (time - lastTime > 1000) {
+    fps = frameCount;
+    frameCount = 0;
+    lastTime = time;
+    document.getElementById('fps-badge').textContent = fps + ' fps';
+  }
+}
+animate(0);
+
+// ===== AUTO-LOAD FROM URL PARAM =====
+const params = new URLSearchParams(window.location.search);
+const autoGlb = params.get('glb');
+if (autoGlb) {
+  document.getElementById('glb-url-input').value = autoGlb;
+  loadGLB(autoGlb, autoGlb);
+  document.getElementById('qr-label').textContent = 'このページのQR';
+}
+</script>
+
+<!-- QR lib placeholder (loaded lazily) -->
+</body>
+</html>
