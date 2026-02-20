@@ -185,7 +185,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.VSMShadowMap; // よりリアルな影
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.003;
@@ -219,7 +219,6 @@ dirLight.shadow.camera.top     =  60;
 dirLight.shadow.camera.bottom  = -60;
 dirLight.shadow.bias           = -0.0005;
 dirLight.shadow.normalBias     = 0.02;
-dirLight.shadow.radius         = 4; // VSMでのぼかし
 scene.add(dirLight);
 
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x888866, 100);
@@ -350,20 +349,14 @@ function loadGLB(url, displayUrl) {
         obj.castShadow = true;
         obj.receiveShadow = true;
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        mats.forEach((m, mi) => {
+        mats.forEach(m => {
           if (!m) return;
-          // MeshStandardMaterial以外はroughness/metalnessがないので変換
-          if (!m.isMeshStandardMaterial) {
-            const std = new THREE.MeshStandardMaterial();
-            std.copy(m);
-            if (Array.isArray(obj.material)) obj.material[mi] = std;
-            else obj.material = std;
-            m = std;
+          // MeshStandardMaterialのみ roughness/metalness を調整
+          if (m.isMeshStandardMaterial) {
+            m.roughness = Math.max(0, (m.roughness ?? 0.5) - 0.5);
+            m.metalness = Math.min(1, (m.metalness ?? 0)   + 0.5);
+            m.needsUpdate = true;
           }
-          m.shadowSide = THREE.FrontSide;
-          m.roughness  = Math.max(0, (m.roughness ?? 0.5) - 0.5);
-          m.metalness  = Math.min(1, (m.metalness ?? 0)   + 0.5);
-          m.needsUpdate = true;
         });
       }
     });
