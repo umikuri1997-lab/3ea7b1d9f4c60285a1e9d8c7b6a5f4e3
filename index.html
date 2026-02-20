@@ -217,8 +217,8 @@
         </div>
         <div class="slider-row">
           <label>地面色</label>
-          <input type="color" value="#888866" id="sl-hemi-gnd" oninput="updateLighting()">
-          <span class="slider-val" id="sv-hemi-gnd">#888866</span>
+          <input type="color" value="#ffffff" id="sl-hemi-gnd" oninput="updateLighting()">
+          <span class="slider-val" id="sv-hemi-gnd">#ffffff</span>
         </div>
 
         <div class="slider-group-label">▸ マテリアル / ポスプロ</div>
@@ -349,7 +349,7 @@ dirLight.shadow.bias           = -0.0005;
 dirLight.shadow.normalBias     = 0.02;
 scene.add(dirLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x888866, 0.1);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.1);
 scene.add(hemiLight);
 
 // ===== HDR =====
@@ -376,6 +376,7 @@ pmremGenerator.compileEquirectangularShader();
 }
 
 let currentEnvMap = null;
+let currentBgMap = null;
 let hdrBgEnabled = true;
 let activeHdrIdx = -1;
 let HDR_PRESETS = [];
@@ -431,9 +432,13 @@ function loadHDR(idx) {
   const url = './hdr/' + preset.file;
   return new Promise((resolve, reject) => {
     rgbeLoader.load(url, (texture) => {
-      // グレースケール化
+      // カラー版 → 背景用
+      if (currentBgMap) currentBgMap.dispose();
+      currentBgMap = pmremGenerator.fromEquirectangular(texture).texture;
+
+      // グレースケール化 → 反射用
       const data = texture.image.data;
-      const channels = 4; // RGBA
+      const channels = 4;
       for (let i = 0; i < data.length; i += channels) {
         const gray = data[i] * 0.2126 + data[i+1] * 0.7152 + data[i+2] * 0.0722;
         data[i] = gray;
@@ -445,9 +450,10 @@ function loadHDR(idx) {
       if (currentEnvMap) currentEnvMap.dispose();
       currentEnvMap = pmremGenerator.fromEquirectangular(texture).texture;
       texture.dispose();
+
       scene.environment = currentEnvMap;
       if (hdrBgEnabled) {
-        scene.background = currentEnvMap;
+        scene.background = currentBgMap;
         scene.backgroundIntensity = 1.0;
       }
       resolve();
@@ -460,8 +466,8 @@ function loadHDR(idx) {
 
 window.toggleHDRBackground = function() {
   hdrBgEnabled = document.getElementById('hdr-bg-toggle').checked;
-  if (hdrBgEnabled && currentEnvMap) {
-    scene.background = currentEnvMap;
+  if (hdrBgEnabled && currentBgMap) {
+    scene.background = currentBgMap;
     scene.backgroundIntensity = 1.0;
     scene.fog = null;
   } else {
@@ -733,7 +739,7 @@ window.closeLoadDialog = function() {
 const LIGHT_DEFAULTS = {
   exposure:0.95, dir:2.0, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
   amb:0.15, ambColor:'#ffffff',
-  hemi:0.1, hemiSky:'#ffffff', hemiGnd:'#888866',
+  hemi:0.1, hemiSky:'#ffffff', hemiGnd:'#ffffff',
   envmap:1.2, bloomStr:0.06, bloomTh:0.9
 };
 let dirLightDist = 50; // モデル読み込み時に更新
