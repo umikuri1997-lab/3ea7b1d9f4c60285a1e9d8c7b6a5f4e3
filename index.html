@@ -178,6 +178,10 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ===== RENDERER =====
 const container = document.getElementById('canvas-container');
@@ -188,7 +192,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.003;
+renderer.toneMappingExposure = 1.2;
 container.appendChild(renderer.domElement);
 
 // ===== SCENE =====
@@ -201,11 +205,25 @@ let activeCamera = walkCamera;
 let glbCameras = [];
 let activeCamIdx = -1;
 
+// ===== POST-PROCESSING (Bloom) =====
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, walkCamera);
+composer.addPass(renderPass);
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  0.15,   // strength – 控えめなグロー
+  0.6,    // radius
+  0.85    // threshold – 明るい部分だけ光る
+);
+composer.addPass(bloomPass);
+const outputPass = new OutputPass();
+composer.addPass(outputPass);
+
 // ===== LIGHTING =====
-const ambient = new THREE.AmbientLight(0xffffff, 500);
+const ambient = new THREE.AmbientLight(0xffffff, 0.4);
 scene.add(ambient);
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 500);
+const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
 dirLight.position.set(15, 30, 15);
 dirLight.castShadow = true;
 // 高品質影の設定
@@ -221,7 +239,7 @@ dirLight.shadow.bias           = -0.0005;
 dirLight.shadow.normalBias     = 0.02;
 scene.add(dirLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x888866, 100);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x888866, 0.3);
 scene.add(hemiLight);
 
 // ===== HDR =====
@@ -232,12 +250,15 @@ pmremGenerator.compileEquirectangularShader();
 // HDRがない場合でも黒くならないニュートラル環境マップ（Canvas生成）
 {
   const c = document.createElement('canvas');
-  c.width = 64; c.height = 32;
+  c.width = 128; c.height = 64;
   const ctx = c.getContext('2d');
-  const g = ctx.createLinearGradient(0, 0, 0, 32);
-  g.addColorStop(0, '#aaaaaa');
-  g.addColorStop(1, '#555555');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 32);
+  // より明るいグラデーションで反射のコントラストを確保
+  const g = ctx.createLinearGradient(0, 0, 0, 64);
+  g.addColorStop(0, '#dde4f0');
+  g.addColorStop(0.4, '#c8cfe0');
+  g.addColorStop(0.5, '#b0b8c8');
+  g.addColorStop(1, '#6a7080');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 64);
   const tex = new THREE.CanvasTexture(c);
   tex.mapping = THREE.EquirectangularReflectionMapping;
   const neutralEnv = pmremGenerator.fromEquirectangular(tex).texture;
@@ -307,7 +328,7 @@ function loadHDR(idx) {
       scene.environment = currentEnvMap;
       if (hdrBgEnabled) {
         scene.background = currentEnvMap;
-        scene.backgroundIntensity = 500;
+        scene.backgroundIntensity = 1.0;
       }
       resolve();
     }, undefined, (err) => {
@@ -321,7 +342,7 @@ window.toggleHDRBackground = function() {
   hdrBgEnabled = document.getElementById('hdr-bg-toggle').checked;
   if (hdrBgEnabled && currentEnvMap) {
     scene.background = currentEnvMap;
-    scene.backgroundIntensity = 500;
+    scene.backgroundIntensity = 1.0;
     scene.fog = null;
   } else {
     scene.background = new THREE.Color(0x0a0a0b);
@@ -364,6 +385,14 @@ function loadGLB(url, displayUrl) {
       if (obj.isMesh) {
         obj.castShadow = true;
         obj.receiveShadow = true;
+        // マテリアルの環境反射を強化
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach(mat => {
+          if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
+            mat.envMapIntensity = 1.8;
+            mat.needsUpdate = true;
+          }
+        });
       }
     });
     scene.add(gltf.scene);
@@ -519,6 +548,8 @@ window.addEventListener('resize', () => {
   walkCamera.updateProjectionMatrix();
   glbCameras.forEach(cam => { if (cam.isPerspectiveCamera) { cam.aspect = window.innerWidth / window.innerHeight; cam.updateProjectionMatrix(); } });
   renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+  bloomPass.resolution.set(window.innerWidth, window.innerHeight);
 });
 
 // ===== RENDER LOOP =====
@@ -526,7 +557,8 @@ let lastTime = 0, frameCount = 0;
 function animate(time) {
   requestAnimationFrame(animate);
   updateWalk();
-  renderer.render(scene, activeCamera);
+  renderPass.camera = activeCamera;
+  composer.render();
   frameCount++;
   if (time - lastTime > 1000) {
     document.getElementById('fps-badge').textContent = frameCount + ' fps';
