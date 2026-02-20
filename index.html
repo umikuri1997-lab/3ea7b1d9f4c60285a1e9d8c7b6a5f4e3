@@ -559,7 +559,12 @@ function loadGLB(url, displayUrl) {
     document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
     const parts = (displayUrl || url).split('/');
     document.getElementById('model-name').textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb');
-    activeCamIdx = -1; activeCamera = walkCamera;
+    activeCamera = walkCamera;
+    activeCamIdx = -1;
+    // GLBカメラがあれば最初のカメラ位置からスタート
+    if (glbCameras.length > 0) {
+      switchCamera(0);
+    }
   },
   (progress) => {
     if (progress.total > 0) loadBarInner.style.width = (progress.loaded / progress.total * 100).toFixed(0) + '%';
@@ -593,19 +598,21 @@ function buildCameraList() {
 }
 
 window.switchCamera = function(idx) {
-  activeCamIdx = idx;
-  if (idx === -1) {
-    activeCamera = walkCamera;
-    document.getElementById('lock-msg').style.display = 'block';
-  } else {
-    activeCamera = glbCameras[idx];
-    if (activeCamera.isPerspectiveCamera) { activeCamera.aspect = window.innerWidth / window.innerHeight; activeCamera.updateProjectionMatrix(); }
-    document.getElementById('lock-msg').style.display = 'none';
-    if (document.pointerLockElement) document.exitPointerLock();
-    isLocked = false;
-    document.getElementById('crosshair').style.display = 'none';
-    document.body.classList.remove('walking');
+  activeCamIdx = -1; // 常にウォークモード
+  activeCamera = walkCamera;
+
+  if (idx >= 0 && glbCameras[idx]) {
+    // GLBカメラの位置と向きをwalkCameraにコピー
+    const cam = glbCameras[idx];
+    cam.updateMatrixWorld(true);
+    walkCamera.position.setFromMatrixPosition(cam.matrixWorld);
+    // 向きからyaw/pitchを抽出
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(new THREE.Quaternion()));
+    yaw = Math.atan2(-dir.x, -dir.z);
+    pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
   }
+
+  document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
   document.querySelectorAll('.cam-item').forEach(el => el.classList.toggle('active', parseInt(el.dataset.idx) === idx));
 };
 
@@ -615,7 +622,7 @@ const keys = {};
 const moveSpeed = 0.1;
 
 renderer.domElement.addEventListener('click', () => {
-  if (activeCamIdx !== -1 || !loadedModel || isMobile) return;
+  if (!loadedModel || isMobile) return;
   renderer.domElement.requestPointerLock();
 });
 document.addEventListener('pointerlockchange', () => {
