@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WalkView Pro - White Balance Edition</title>
+<title>GLB Walkthrough Viewer</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap');
   :root {
@@ -24,148 +24,263 @@
   .btn{background:var(--accent);color:#0a0a0b;border:none;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:7px 14px;cursor:pointer;transition:opacity 0.15s;}
   .btn:hover{opacity:0.85;}
   .btn.secondary{background:transparent;color:var(--text);border:1px solid var(--border);}
+  .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
 
   /* Panel toggle */
-  #panel-toggle{position:absolute;top:52px;left:0;background:var(--surface);border:1px solid var(--border);border-left:none;padding:10px 8px;cursor:pointer;pointer-events:all;z-index:11;transition:left 0.3s;color:var(--text);}
+  #panel-toggle{position:absolute;top:52px;left:0;background:var(--surface);border:1px solid var(--border);border-left:none;padding:10px 8px;cursor:pointer;pointer-events:all;z-index:11;transition:left 0.3s cubic-bezier(0.16,1,0.3,1);font-size:14px;line-height:1;color:var(--text);font-family:monospace;}
   #panel-toggle.open{left:var(--panel-w);}
 
   /* Left panel */
-  #panel-left{position:absolute;top:52px;left:0;bottom:0;width:var(--panel-w);background:rgba(10,10,11,0.9);backdrop-filter:blur(12px);border-right:1px solid var(--border);display:flex;flex-direction:column;transform:translateX(-100%);transition:transform 0.3s;pointer-events:all;overflow-y:auto;}
+  #panel-left{position:absolute;top:52px;left:0;bottom:0;width:var(--panel-w);background:rgba(10,10,11,0.9);backdrop-filter:blur(12px);border-right:1px solid var(--border);display:flex;flex-direction:column;transform:translateX(-100%);transition:transform 0.3s cubic-bezier(0.16,1,0.3,1);pointer-events:all;overflow-y:auto;}
   #panel-left.open{transform:translateX(0);}
+  #panel-left::-webkit-scrollbar{width:3px;}
+  #panel-left::-webkit-scrollbar-thumb{background:var(--border);}
 
   .panel-section{border-bottom:1px solid var(--border);}
-  .panel-header{padding:12px 20px;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);cursor:pointer;display:flex;justify-content:space-between;}
+  .panel-header{padding:12px 20px;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:color 0.2s;}
+  .panel-header:hover{color:var(--text);}
+  .panel-header .arrow{font-size:10px;transition:transform 0.25s;}
+  .panel-header.open .arrow{transform:rotate(180deg);}
   .panel-body{padding:8px 0;display:none;}
   .panel-body.open{display:block;}
 
-  /* UI Components */
+  /* Camera list */
+  .cam-item{display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;transition:background 0.1s;border-left:2px solid transparent;}
+  .cam-item:hover{background:rgba(200,255,0,0.05);}
+  .cam-item.active{border-left-color:var(--accent);background:rgba(200,255,0,0.08);}
+  .cam-icon{width:28px;height:28px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;}
+  .cam-item.active .cam-icon{border-color:var(--accent);}
+  .cam-label{font-family:'DM Mono',monospace;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  /* HDR section */
   .hdr-presets{padding:8px 12px;}
-  .hdr-preset-btn{width:100%;text-align:left;padding:8px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;margin-bottom:4px;}
-  .hdr-preset-btn.active{border-color:var(--accent);color:var(--accent);}
+  .hdr-preset-btn{width:100%;text-align:left;padding:8px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;margin-bottom:4px;transition:all 0.2s;display:flex;align-items:center;gap:8px;}
+  .hdr-preset-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .hdr-preset-btn.active{border-color:var(--accent);background:rgba(200,255,0,0.08);color:var(--accent);}
+  .hdr-dot{width:24px;height:24px;border-radius:50%;flex-shrink:0;}
 
+  .hdr-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 20px 12px;}
+  .hdr-toggle-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);}
+  .mini-toggle{position:relative;width:32px;height:18px;}
+  .mini-toggle input{opacity:0;width:0;height:0;}
+  .mini-slider{position:absolute;inset:0;background:rgba(255,255,255,0.1);border-radius:18px;cursor:pointer;transition:background 0.2s;}
+  .mini-slider::before{content:'';position:absolute;width:12px;height:12px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform 0.2s;}
+  .mini-toggle input:checked+.mini-slider{background:var(--accent);}
+  .mini-toggle input:checked+.mini-slider::before{transform:translateX(14px);}
+
+  /* Controls hint */
+  #controls-hint{padding:14px 20px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);line-height:1.9;}
+  .hint-key{display:inline-block;background:var(--border);padding:1px 5px;font-size:9px;color:var(--text);}
+
+  /* Slider rows */
   .slider-row{display:flex;align-items:center;gap:6px;padding:5px 16px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);}
-  .slider-row label{width:70px;flex-shrink:0;}
-  .slider-row input[type="range"]{flex:1;height:3px;-webkit-appearance:none;background:var(--border);outline:none;border-radius:2px;}
-  .slider-row input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:var(--accent);cursor:pointer;}
-  .slider-val{width:34px;text-align:right;color:var(--text);}
-  .slider-group-label{padding:12px 16px 4px;font-size:9px;font-weight:700;color:var(--accent);opacity:0.7;text-transform:uppercase;}
-  input[type="color"]{background:none;border:1px solid var(--border);height:20px;width:40px;cursor:pointer;}
-  select{background:var(--surface);color:var(--text);border:1px solid var(--border);font-size:10px;padding:2px;}
+  .slider-row label{width:62px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .slider-row input[type="range"]{flex:1;height:3px;-webkit-appearance:none;appearance:none;background:var(--border);outline:none;border-radius:2px;cursor:pointer;}
+  .slider-row input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent);cursor:pointer;}
+  .slider-row input[type="range"]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;}
+  .slider-val{width:34px;text-align:right;font-size:10px;color:var(--text);flex-shrink:0;}
+  .slider-group-label{padding:8px 16px 2px;font-family:'DM Mono',monospace;font-size:9px;font-weight:700;letter-spacing:0.1em;color:var(--accent);opacity:0.7;}
+  .slider-row input[type="color"]{flex:1;height:22px;border:1px solid var(--border);background:var(--surface);cursor:pointer;padding:1px 2px;max-width:80px;}
 
-  /* Overlay */
-  #overlay-msg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:all;background:rgba(10,10,11,0.8);z-index:100;}
-  .msg-box{background:var(--surface);border:1px solid var(--border);padding:40px;text-align:center;width:320px;}
-  .url-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px;margin:15px 0;font-family:'DM Mono',monospace;}
+  /* Center overlay */
+  #overlay-msg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:all;}
+  .msg-box{background:rgba(10,10,11,0.92);border:1px solid var(--border);padding:40px 48px;text-align:center;max-width:480px;width:90%;backdrop-filter:blur(20px);}
+  .msg-title{font-size:28px;font-weight:800;letter-spacing:-0.02em;margin-bottom:8px;}
+  .msg-title span{color:var(--accent);}
+  .msg-sub{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);margin-bottom:28px;line-height:1.6;}
+  .url-input-wrap{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;}
+  .url-input{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:10px 14px;width:100%;outline:none;transition:border-color 0.2s;}
+  .url-input:focus{border-color:var(--accent);}
+  .url-input::placeholder{color:var(--muted);}
+  .input-hint{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-align:left;padding:0 2px;}
+  #loading-bar-wrap{position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--border);display:none;}
+  #loading-bar{height:100%;background:var(--accent);width:0%;transition:width 0.2s;}
 
-  #crosshair{position:absolute;top:50%;left:50%;width:10px;height:10px;border:1px solid var(--accent);transform:translate(-50%,-50%);pointer-events:none;display:none;border-radius:50%;}
-  #fps-badge{position:absolute;top:60px;right:20px;font-size:10px;color:var(--muted);font-family:'DM Mono';}
-  #lock-msg{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--muted);background:rgba(0,0,0,0.5);padding:5px 15px;border-radius:20px;display:none;}
+  /* Bottom right */
+  #bottom-right{position:absolute;bottom:20px;right:20px;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:all;}
+  #lock-msg{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(10,10,11,0.85);border:1px solid var(--border);padding:8px 16px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);pointer-events:none;white-space:nowrap;display:none;}
+
+  body.walking{cursor:none;}
+  #crosshair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;display:none;}
+  #crosshair::before,#crosshair::after{content:'';position:absolute;background:rgba(200,255,0,0.8);}
+  #crosshair::before{width:12px;height:1px;top:0;left:-6px;}
+  #crosshair::after{width:1px;height:12px;top:-6px;left:0;}
+  #fps-badge{position:absolute;top:60px;right:14px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);pointer-events:none;}
+
+  @media(max-width:600px){:root{--panel-w:240px;}.msg-box{padding:28px 24px;}.msg-title{font-size:22px;}}
 </style>
 </head>
 <body>
-
 <div id="canvas-container"></div>
-<div id="fps-badge">0 fps</div>
-<div id="crosshair"></div>
-<div id="lock-msg">CLICK TO EXPLORE</div>
-
 <div id="ui">
   <div id="topbar">
-    <div id="logo">Walk<span style="color:var(--text)">View</span> PRO</div>
-    <div id="model-name">No Model Loaded</div>
-    <button class="btn secondary" onclick="showLoadDialog()">LOAD GLB</button>
+    <div id="logo">Walk<span style="color:var(--text)">View</span></div>
+    <div id="model-name">GLBファイルを読み込んでください</div>
+    <button class="btn secondary" id="btn-reload" style="display:none" onclick="showLoadDialog()">変更</button>
   </div>
 
   <button id="panel-toggle" onclick="togglePanel()">☰</button>
 
   <div id="panel-left">
+    <!-- Camera section -->
     <div class="panel-section">
-      <div class="panel-header open" onclick="toggleSection(this)"><span>📷 CAMERAS</span><span>▾</span></div>
+      <div class="panel-header open" onclick="toggleSection(this)">
+        <span>📷 カメラ</span><span class="arrow">▾</span>
+      </div>
       <div class="panel-body open" id="camera-list">
-        <div style="padding:15px; font-size:10px; color:var(--muted);">Load a GLB to see cameras</div>
+        <div style="padding:16px 20px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">GLBを読み込むと表示</div>
       </div>
     </div>
 
+    <!-- HDR section -->
     <div class="panel-section">
-      <div class="panel-header" onclick="toggleSection(this)"><span>🌅 HDR (GRAY REFLECTION)</span><span>▾</span></div>
-      <div class="panel-body">
-        <div style="padding:0 16px 10px; font-size:9px; color:var(--muted);">Background is Color / Environment is Grayscale</div>
-        <div class="slider-row">
-          <label>Show BG</label>
-          <input type="checkbox" id="hdr-bg-toggle" checked onchange="toggleHDRBackground()">
+      <div class="panel-header" onclick="toggleSection(this)">
+        <span>🌅 HDR 環境光</span><span class="arrow">▾</span>
+      </div>
+      <div class="panel-body" id="hdr-body">
+        <div class="hdr-toggle-row">
+          <span class="hdr-toggle-label">背景に表示</span>
+          <label class="mini-toggle">
+            <input type="checkbox" id="hdr-bg-toggle" checked onchange="toggleHDRBackground()">
+            <div class="mini-slider"></div>
+          </label>
         </div>
         <div class="hdr-presets" id="hdr-presets"></div>
       </div>
     </div>
 
+    <!-- Lighting adjust -->
     <div class="panel-section">
-      <div class="panel-header" onclick="toggleSection(this)"><span>💡 LIGHTING & COLOR</span><span>▾</span></div>
-      <div class="panel-body">
-        <div class="slider-group-label">Tone Mapping</div>
+      <div class="panel-header" onclick="toggleSection(this)">
+        <span>💡 ライティング調整</span><span class="arrow">▾</span>
+      </div>
+      <div class="panel-body" id="light-body">
+
+        <div class="slider-group-label">▸ トーンマッピング</div>
         <div class="slider-row">
-          <label>Type</label>
-          <select id="sl-tone-type" onchange="updateLighting()">
-            <option value="Neutral" selected>Neutral (Stable)</option>
-            <option value="ACESFilmic">ACES Filmic</option>
-            <option value="No">Linear</option>
-          </select>
-        </div>
-        <div class="slider-row">
-          <label>Exposure</label>
-          <input type="range" min="0.1" max="4" step="0.05" value="1.0" id="sl-exposure" oninput="updateLighting()">
-          <span class="slider-val" id="sv-exposure">1.0</span>
+          <label>露出</label>
+          <input type="range" min="0.1" max="3" step="0.05" value="0.95" id="sl-exposure" oninput="updateLighting()">
+          <span class="slider-val" id="sv-exposure">0.95</span>
         </div>
 
-        <div class="slider-group-label">Anti-Yellow (Hemisphere)</div>
+        <div class="slider-group-label">▸ 直射光 (Directional)</div>
         <div class="slider-row">
-          <label>Strength</label>
-          <input type="range" min="0" max="2" step="0.01" value="0.5" id="sl-hemi" oninput="updateLighting()">
-          <span class="slider-val" id="sv-hemi">0.5</span>
+          <label>強度</label>
+          <input type="range" min="0" max="8" step="0.1" value="2.0" id="sl-dir" oninput="updateLighting()">
+          <span class="slider-val" id="sv-dir">2.0</span>
         </div>
         <div class="slider-row">
-          <label>Sky Color</label><input type="color" value="#ffffff" id="sl-hemi-sky" oninput="updateLighting()">
+          <label>色</label>
+          <input type="color" value="#ffffff" id="sl-dir-color" oninput="updateLighting()">
+          <span class="slider-val" id="sv-dir-color">#fff</span>
         </div>
         <div class="slider-row">
-          <label>Gnd Color</label><input type="color" value="#ffffff" id="sl-hemi-gnd" oninput="updateLighting()">
+          <label>水平角</label>
+          <input type="range" min="0" max="360" step="1" value="45" id="sl-dir-azimuth" oninput="updateLighting()">
+          <span class="slider-val" id="sv-dir-azimuth">45°</span>
+        </div>
+        <div class="slider-row">
+          <label>仰角</label>
+          <input type="range" min="5" max="90" step="1" value="60" id="sl-dir-elevation" oninput="updateLighting()">
+          <span class="slider-val" id="sv-dir-elevation">60°</span>
+        </div>
+        <div class="hdr-toggle-row" style="padding:4px 16px 8px">
+          <span class="hdr-toggle-label">影</span>
+          <label class="mini-toggle">
+            <input type="checkbox" id="sl-dir-shadow" checked oninput="updateLighting()">
+            <div class="mini-slider"></div>
+          </label>
         </div>
 
-        <div class="slider-group-label">Environment</div>
+        <div class="slider-group-label">▸ 環境光 (Ambient)</div>
         <div class="slider-row">
-          <label>Reflection</label>
-          <input type="range" min="0" max="2" step="0.1" value="1.0" id="sl-envmap" oninput="updateLighting()">
-          <span class="slider-val" id="sv-envmap">1.0</span>
+          <label>強度</label>
+          <input type="range" min="0" max="2" step="0.01" value="0.15" id="sl-amb" oninput="updateLighting()">
+          <span class="slider-val" id="sv-amb">0.15</span>
         </div>
         <div class="slider-row">
-          <label>Rotation</label>
-          <input type="range" min="0" max="360" step="1" value="0" id="sl-env-rot" oninput="updateLighting()">
-          <span class="slider-val" id="sv-env-rot">0°</span>
+          <label>色</label>
+          <input type="color" value="#ffffff" id="sl-amb-color" oninput="updateLighting()">
+          <span class="slider-val" id="sv-amb-color">#fff</span>
+        </div>
+
+        <div class="slider-group-label">▸ 半球光 (Hemisphere)</div>
+        <div class="slider-row">
+          <label>強度</label>
+          <input type="range" min="0" max="2" step="0.01" value="0.1" id="sl-hemi" oninput="updateLighting()">
+          <span class="slider-val" id="sv-hemi">0.10</span>
         </div>
         <div class="slider-row">
-          <label>Bloom</label>
-          <input type="range" min="0" max="0.5" step="0.01" value="0.05" id="sl-bloom" oninput="updateLighting()">
-          <span class="slider-val" id="sv-bloom">0.05</span>
+          <label>天空色</label>
+          <input type="color" value="#ffffff" id="sl-hemi-sky" oninput="updateLighting()">
+          <span class="slider-val" id="sv-hemi-sky">#fff</span>
+        </div>
+        <div class="slider-row">
+          <label>地面色</label>
+          <input type="color" value="#888866" id="sl-hemi-gnd" oninput="updateLighting()">
+          <span class="slider-val" id="sv-hemi-gnd">#888866</span>
+        </div>
+
+        <div class="slider-group-label">▸ マテリアル / ポスプロ</div>
+        <div class="slider-row">
+          <label>反射強度</label>
+          <input type="range" min="0" max="4" step="0.1" value="1.2" id="sl-envmap" oninput="updateLighting()">
+          <span class="slider-val" id="sv-envmap">1.2</span>
+        </div>
+        <div class="slider-row">
+          <label>Bloom 強度</label>
+          <input type="range" min="0" max="0.5" step="0.01" value="0.06" id="sl-bloom-str" oninput="updateLighting()">
+          <span class="slider-val" id="sv-bloom-str">0.06</span>
+        </div>
+        <div class="slider-row">
+          <label>Bloom 閾値</label>
+          <input type="range" min="0" max="1.5" step="0.01" value="0.9" id="sl-bloom-th" oninput="updateLighting()">
+          <span class="slider-val" id="sv-bloom-th">0.90</span>
+        </div>
+
+        <div style="padding:4px 16px 12px">
+          <button class="btn secondary" style="width:100%;padding:6px;font-size:10px" onclick="resetLighting()">リセット</button>
         </div>
       </div>
     </div>
-  </div>
-</div>
 
-<div id="overlay-msg">
-  <div class="msg-box">
-    <div style="font-weight:800; letter-spacing:2px;">LOAD GLB MODEL</div>
-    <input type="text" id="glb-url-input" class="url-input" placeholder="https://example.com/model.glb">
-    <button class="btn" onclick="loadFromInput()" style="width:100%">LOAD</button>
-    <button class="btn secondary" onclick="closeLoadDialog()" style="width:100%; margin-top:10px;">CANCEL</button>
+    <!-- Controls -->
+    <div style="margin-top:auto;">
+      <div id="controls-hint">
+        <span class="hint-key">W A S D</span> 移動<br>
+        <span class="hint-key">Mouse</span> 視点<br>
+        <span class="hint-key">Space</span> 上昇 &nbsp;<span class="hint-key">Shift</span> 下降<br>
+        <span class="hint-key">Esc</span> 解放<br>
+        <br>
+        <span style="color:var(--accent)">📱 モバイル</span><br>
+        左半分ドラッグ → 移動<br>
+        右半分ドラッグ → 視点
+      </div>
+    </div>
   </div>
+
+  <div id="overlay-msg">
+    <div class="msg-box">
+      <div class="msg-title">Walk<span>View</span></div>
+      <div class="msg-sub">GLBウォークスルービューア<br>URLを入力して読み込み</div>
+      <div class="url-input-wrap">
+        <input class="url-input" id="glb-url-input" type="text" placeholder="https://...supabase.co/.../model.glb" />
+        <div class="input-hint">💡 アップローダーで生成されたURLを貼り付けてください</div>
+      </div>
+      <button class="btn" onclick="loadFromInput()" style="width:100%;padding:12px">GLBを読み込む →</button>
+      <button class="btn secondary" id="btn-close-overlay" onclick="closeLoadDialog()" style="width:100%;padding:10px;margin-top:8px;display:none">✕ 閉じる</button>
+    </div>
+    <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+  </div>
+
+  <div id="crosshair"></div>
+
+  <div id="lock-msg">クリックして歩行モード開始 — Escで解放</div>
+  <div id="fps-badge"></div>
 </div>
 
 <script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-  }
-}
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
 </script>
 
 <script type="module">
@@ -178,251 +293,558 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-// --- CORE ---
+// ===== RENDERER =====
+const container = document.getElementById('canvas-container');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.NeutralToneMapping;
-document.getElementById('canvas-container').appendChild(renderer.domElement);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+container.appendChild(renderer.domElement);
 
+// ===== SCENE =====
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0a0b);
 
-const walkCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-walkCamera.position.set(0, 1.6, 5);
+const walkCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 500);
+walkCamera.position.set(0, 1.6, 0);
 let activeCamera = walkCamera;
 let glbCameras = [];
 let activeCamIdx = -1;
 
+// ===== POST-PROCESSING (Bloom) =====
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, walkCamera);
 composer.addPass(renderPass);
-const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.05, 0.4, 0.9);
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  0.06,   // strength – ごく控えめなグロー
+  0.4,    // radius
+  0.9     // threshold – より明るい部分だけ光る
+);
 composer.addPass(bloomPass);
-composer.addPass(new OutputPass());
+const outputPass = new OutputPass();
+composer.addPass(outputPass);
 
-// --- LIGHTS ---
-const ambient = new THREE.AmbientLight(0xffffff, 0.1);
+// ===== LIGHTING =====
+const ambient = new THREE.AmbientLight(0xffffff, 0.15);
 scene.add(ambient);
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
-dirLight.position.set(10, 20, 10);
+const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
+dirLight.position.set(15, 30, 15);
 dirLight.castShadow = true;
-dirLight.shadow.mapSize.set(2048, 2048);
+// 高品質影の設定
+dirLight.shadow.mapSize.width  = 4096;
+dirLight.shadow.mapSize.height = 4096;
+dirLight.shadow.camera.near    = 0.1;
+dirLight.shadow.camera.far     = 300;
+dirLight.shadow.camera.left    = -60;
+dirLight.shadow.camera.right   =  60;
+dirLight.shadow.camera.top     =  60;
+dirLight.shadow.camera.bottom  = -60;
+dirLight.shadow.bias           = -0.0005;
+dirLight.shadow.normalBias     = 0.02;
 scene.add(dirLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.5);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x888866, 0.1);
 scene.add(hemiLight);
 
-// --- HDR & MONO REFLECTION LOGIC ---
+// ===== HDR =====
 const rgbeLoader = new RGBELoader();
 const pmremGenerator = new THREE.PMREMGenerator(renderer);
 pmremGenerator.compileEquirectangularShader();
 
-let currentColorHDR = null;
+// HDRがない場合でも黒くならないニュートラル環境マップ（Canvas生成）
+{
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 64);
+  g.addColorStop(0, '#a0a8b8');
+  g.addColorStop(0.4, '#8890a0');
+  g.addColorStop(0.5, '#707888');
+  g.addColorStop(1, '#404550');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 64);
+  const tex = new THREE.CanvasTexture(c);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  const neutralEnv = pmremGenerator.fromEquirectangular(tex).texture;
+  tex.dispose();
+  scene.environment = neutralEnv;
+}
+
 let currentEnvMap = null;
 let hdrBgEnabled = true;
+let activeHdrIdx = -1;
 let HDR_PRESETS = [];
 
-async function loadHDR(idx) {
-  if (!HDR_PRESETS[idx]) return;
-  const url = './hdr/' + HDR_PRESETS[idx].file;
-  
-  rgbeLoader.load(url, (texture) => {
-    // 1. Color for Background
-    texture.mapping = THREE.EquirectangularReflectionMapping;
-    currentColorHDR = texture;
-    if (hdrBgEnabled) scene.background = currentColorHDR;
+async function buildHDRPanel() {
+  const container = document.getElementById('hdr-presets');
+  container.innerHTML = '<div style="padding:8px 12px;font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted)">読み込み中...</div>';
 
-    // 2. Grayscale for Environment (Reflection)
-    const img = texture.image;
-    const data = img.data;
-    const grayData = new data.constructor(data.length);
+  try {
+    // GitHub APIでhdrフォルダのファイル一覧を取得
+    // URLからオーナーとリポジトリ名を抽出
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    const repoName = pathParts[0] || '';
+    const owner = window.location.hostname.split('.')[0];
+    const apiUrl = `https://api.github.com/repos/${owner}/${repoName}/contents/hdr`;
 
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i], g = data[i+1], b = data[i+2];
-      const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      grayData[i] = grayData[i+1] = grayData[i+2] = luminance;
-      if (data[i+3] !== undefined) grayData[i+3] = data[i+3];
-    }
+    const res = await fetch(apiUrl);
+    if (!res.ok) throw new Error('API error');
+    const files = await res.json();
 
-    const grayTex = new THREE.DataTexture(grayData, img.width, img.height, texture.format, texture.type);
-    grayTex.mapping = THREE.EquirectangularReflectionMapping;
-    grayTex.needsUpdate = true;
+    HDR_PRESETS = files
+      .filter(f => f.name.toLowerCase().endsWith('.hdr'))
+      .map(f => ({ file: f.name, label: f.name }));
 
-    if (currentEnvMap) currentEnvMap.dispose();
-    currentEnvMap = pmremGenerator.fromEquirectangular(grayTex).texture;
-    scene.environment = currentEnvMap;
+    if (!HDR_PRESETS.length) throw new Error('HDRファイルなし');
 
-    grayTex.dispose();
-    document.querySelectorAll('.hdr-preset-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+  } catch(e) {
+    container.innerHTML = '<div style="padding:8px 12px;font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted)">hdr/ フォルダにHDRファイルを追加してください</div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  HDR_PRESETS.forEach((p, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'hdr-preset-btn';
+    btn.id = 'hdr-btn-' + i;
+    btn.textContent = p.file;
+    btn.onclick = () => loadHDR(i);
+    container.appendChild(btn);
+  });
+
+  // 最初のHDRを自動ロード（エラーは静かに無視）
+  if (HDR_PRESETS.length > 0) {
+    loadHDR(0).catch(() => {});
+  }
+}
+
+function loadHDR(idx) {
+  const preset = HDR_PRESETS[idx];
+  if (!preset) return Promise.resolve();
+  document.querySelectorAll('.hdr-preset-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+  activeHdrIdx = idx;
+  const url = './hdr/' + preset.file;
+  return new Promise((resolve, reject) => {
+    rgbeLoader.load(url, (texture) => {
+      // グレースケール化
+      const data = texture.image.data;
+      const channels = 4; // RGBA
+      for (let i = 0; i < data.length; i += channels) {
+        const gray = data[i] * 0.2126 + data[i+1] * 0.7152 + data[i+2] * 0.0722;
+        data[i] = gray;
+        data[i+1] = gray;
+        data[i+2] = gray;
+      }
+      texture.needsUpdate = true;
+
+      if (currentEnvMap) currentEnvMap.dispose();
+      currentEnvMap = pmremGenerator.fromEquirectangular(texture).texture;
+      texture.dispose();
+      scene.environment = currentEnvMap;
+      if (hdrBgEnabled) {
+        scene.background = currentEnvMap;
+        scene.backgroundIntensity = 1.0;
+      }
+      resolve();
+    }, undefined, (err) => {
+      console.warn('HDR読み込み失敗:', url);
+      reject(err);
+    });
   });
 }
 
-window.toggleHDRBackground = () => {
+window.toggleHDRBackground = function() {
   hdrBgEnabled = document.getElementById('hdr-bg-toggle').checked;
-  scene.background = (hdrBgEnabled && currentColorHDR) ? currentColorHDR : new THREE.Color(0x0a0a0b);
+  if (hdrBgEnabled && currentEnvMap) {
+    scene.background = currentEnvMap;
+    scene.backgroundIntensity = 1.0;
+    scene.fog = null;
+  } else {
+    scene.background = new THREE.Color(0x0a0a0b);
+    scene.backgroundIntensity = 1;
+    if (loadedModel) scene.fog = new THREE.Fog(0x0a0a0b, 30, 120);
+  }
 };
 
-// --- MODEL LOADING ---
-const draco = new DRACOLoader();
-draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+// ===== GLB LOADER =====
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
 const gltfLoader = new GLTFLoader();
-gltfLoader.setDRACOLoader(draco);
+gltfLoader.setDRACOLoader(dracoLoader);
 
 let loadedModel = null;
 
-window.loadFromInput = () => {
-  const url = document.getElementById('glb-url-input').value.trim();
-  if (url) loadGLB(url);
+window.loadFromInput = function() {
+  const raw = document.getElementById('glb-url-input').value.trim();
+  if (!raw) return;
+  let url = raw;
+  try { url = encodeURI(decodeURI(raw)); } catch(e) {}
+  loadGLB(url, raw);
 };
 
-function loadGLB(url) {
-  document.getElementById('overlay-msg').style.display = 'none';
+function loadGLB(url, displayUrl) {
+  const overlay = document.getElementById('overlay-msg');
+  const loadBar = document.getElementById('loading-bar-wrap');
+  const loadBarInner = document.getElementById('loading-bar');
+  loadBar.style.display = 'block';
+  loadBarInner.style.width = '5%';
+
+  const newUrl = new URL(window.location.href);
+  newUrl.searchParams.set('glb', url);
+  window.history.replaceState({}, '', newUrl.toString());
+
   gltfLoader.load(url, (gltf) => {
     if (loadedModel) scene.remove(loadedModel);
     loadedModel = gltf.scene;
-    
-    loadedModel.traverse(child => {
-      if (child.isMesh) {
-        child.castShadow = child.receiveShadow = true;
-        if (child.material) {
-          const mats = Array.isArray(child.material) ? child.material : [child.material];
-          mats.forEach(m => {
-            if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) m.envMapIntensity = 1.0;
-          });
-        }
+    gltf.scene.traverse(obj => {
+      if (obj.isMesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+        // マテリアルの環境反射を強化
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach(mat => {
+          if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
+            mat.envMapIntensity = 1.2;
+            mat.needsUpdate = true;
+          }
+        });
       }
     });
+    scene.add(gltf.scene);
 
-    scene.add(loadedModel);
-    document.getElementById('model-name').textContent = url.split('/').pop();
-    
     // Cameras
     glbCameras = [];
-    gltf.scene.traverse(node => { if (node.isCamera) glbCameras.push(node); });
-    updateCameraUI();
-    
-    // Position walk camera
-    const box = new THREE.Box3().setFromObject(loadedModel);
+    gltf.scene.traverse(obj => { if (obj.isCamera) glbCameras.push(obj); });
+    if (gltf.cameras) gltf.cameras.forEach(c => { if (!glbCameras.includes(c)) glbCameras.push(c); });
+    glbCameras.forEach(cam => {
+      if (cam.isPerspectiveCamera) { cam.aspect = window.innerWidth / window.innerHeight; cam.updateProjectionMatrix(); }
+    });
+
+    // Fit shadow camera to model
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-    walkCamera.position.set(center.x, center.y + 1.6, center.z + 5);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    dirLight.shadow.camera.left   = -maxDim;
+    dirLight.shadow.camera.right  =  maxDim;
+    dirLight.shadow.camera.top    =  maxDim;
+    dirLight.shadow.camera.bottom = -maxDim;
+    dirLight.shadow.camera.far    = maxDim * 4;
+    dirLight.shadow.camera.updateProjectionMatrix();
+    dirLightCenter.copy(center);
+    dirLightDist = maxDim * 2;
+    updateLighting(); // スライダー値で位置を設定
+
+    // Walk camera position
+    const eyeH = size.y * 0.35 + box.min.y;
+    walkCamera.position.set(center.x + Math.max(size.x, size.z) * 0.4, eyeH, center.z + Math.max(size.x, size.z) * 0.4);
     walkCamera.lookAt(center);
+    yaw = -Math.PI / 4; pitch = 0;
 
-    document.getElementById('lock-msg').style.display = 'block';
-    updateLighting();
+    buildCameraList();
+    overlay.style.display = 'none';
+    loadBar.style.display = 'none';
+    document.getElementById('btn-reload').style.display = '';
+    document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
+    const parts = (displayUrl || url).split('/');
+    document.getElementById('model-name').textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb');
+    activeCamIdx = -1; activeCamera = walkCamera;
+  },
+  (progress) => {
+    if (progress.total > 0) loadBarInner.style.width = (progress.loaded / progress.total * 100).toFixed(0) + '%';
+  },
+  (error) => {
+    loadBar.style.display = 'none';
+    alert('読み込みエラー:\n' + error.message);
   });
 }
 
-function updateCameraUI() {
+function buildCameraList() {
   const list = document.getElementById('camera-list');
-  list.innerHTML = `<div style="padding:10px 20px; cursor:pointer; background:rgba(200,255,0,0.1);" onclick="switchCamera(-1)">🚶 WALKTHROUGH</div>`;
-  glbCameras.forEach((cam, i) => {
-    const el = document.createElement('div');
-    el.style.padding = '10px 20px';
-    el.style.cursor = 'pointer';
-    el.style.fontSize = '10px';
-    el.textContent = `📷 ${cam.name || 'Camera ' + i}`;
-    el.onclick = () => switchCamera(i);
-    list.appendChild(el);
-  });
+  list.innerHTML = '';
+  const walkItem = document.createElement('div');
+  walkItem.className = 'cam-item active'; walkItem.dataset.idx = '-1';
+  walkItem.innerHTML = `<div class="cam-icon">🚶</div><div class="cam-label">ウォークスルー</div>`;
+  walkItem.onclick = () => switchCamera(-1);
+  list.appendChild(walkItem);
+  if (!glbCameras.length) {
+    const n = document.createElement('div');
+    n.style = 'padding:8px 20px;font-family:"DM Mono",monospace;font-size:10px;color:var(--muted)';
+    n.textContent = 'GLB内にカメラなし'; list.appendChild(n);
+  } else {
+    glbCameras.forEach((cam, i) => {
+      const item = document.createElement('div');
+      item.className = 'cam-item'; item.dataset.idx = i;
+      item.innerHTML = `<div class="cam-icon">📷</div><div class="cam-label">${cam.name || 'Camera ' + (i+1)}</div>`;
+      item.onclick = () => switchCamera(i); list.appendChild(item);
+    });
+  }
 }
 
-window.switchCamera = (idx) => {
+window.switchCamera = function(idx) {
   activeCamIdx = idx;
-  activeCamera = idx === -1 ? walkCamera : glbCameras[idx];
-  if (activeCamera.isPerspectiveCamera) {
-    activeCamera.aspect = window.innerWidth / window.innerHeight;
-    activeCamera.updateProjectionMatrix();
+  if (idx === -1) {
+    activeCamera = walkCamera;
+    document.getElementById('lock-msg').style.display = 'block';
+  } else {
+    activeCamera = glbCameras[idx];
+    if (activeCamera.isPerspectiveCamera) { activeCamera.aspect = window.innerWidth / window.innerHeight; activeCamera.updateProjectionMatrix(); }
+    document.getElementById('lock-msg').style.display = 'none';
+    if (document.pointerLockElement) document.exitPointerLock();
+    isLocked = false;
+    document.getElementById('crosshair').style.display = 'none';
+    document.body.classList.remove('walking');
+  }
+  document.querySelectorAll('.cam-item').forEach(el => el.classList.toggle('active', parseInt(el.dataset.idx) === idx));
+};
+
+// ===== WALK CONTROLS =====
+let isLocked = false, yaw = 0, pitch = 0;
+const keys = {};
+const moveSpeed = 0.1;
+
+renderer.domElement.addEventListener('click', () => {
+  if (activeCamIdx !== -1 || !loadedModel || isMobile) return;
+  renderer.domElement.requestPointerLock();
+});
+document.addEventListener('pointerlockchange', () => {
+  isLocked = !!document.pointerLockElement;
+  document.getElementById('crosshair').style.display = isLocked ? 'block' : 'none';
+  document.getElementById('lock-msg').style.display = isLocked ? 'none' : (loadedModel ? 'block' : 'none');
+  document.body.classList.toggle('walking', isLocked);
+});
+document.addEventListener('mousemove', e => {
+  if (!isLocked) return;
+  yaw -= e.movementX * 0.002;
+  pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitch - e.movementY * 0.002));
+});
+document.addEventListener('keydown', e => { keys[e.code] = true; });
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// ===== TOUCH CONTROLS (モバイル) =====
+let touchLookId = null, touchMoveId = null;
+let touchLookStart = {x:0, y:0};
+let touchMoveStart = {x:0, y:0};
+let touchMoveVec = {x:0, z:0};
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+renderer.domElement.addEventListener('touchstart', e => {
+  if (activeCamIdx !== -1 || !loadedModel) return;
+  for (const touch of e.changedTouches) {
+    if (touch.clientX > window.innerWidth * 0.4 && touchLookId === null) {
+      // 右半分 → 視点操作
+      touchLookId = touch.identifier;
+      touchLookStart = {x: touch.clientX, y: touch.clientY};
+    } else if (touch.clientX <= window.innerWidth * 0.4 && touchMoveId === null) {
+      // 左半分 → 移動
+      touchMoveId = touch.identifier;
+      touchMoveStart = {x: touch.clientX, y: touch.clientY};
+      touchMoveVec = {x:0, z:0};
+    }
+  }
+}, {passive:true});
+
+renderer.domElement.addEventListener('touchmove', e => {
+  for (const touch of e.changedTouches) {
+    if (touch.identifier === touchLookId) {
+      const dx = touch.clientX - touchLookStart.x;
+      const dy = touch.clientY - touchLookStart.y;
+      yaw -= dx * 0.003;
+      pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitch - dy * 0.003));
+      touchLookStart = {x: touch.clientX, y: touch.clientY};
+    }
+    if (touch.identifier === touchMoveId) {
+      const dx = touch.clientX - touchMoveStart.x;
+      const dy = touch.clientY - touchMoveStart.y;
+      const len = Math.sqrt(dx*dx + dy*dy);
+      if (len > 5) {
+        touchMoveVec = {x: dx / len, z: dy / len};
+      } else {
+        touchMoveVec = {x:0, z:0};
+      }
+    }
+  }
+}, {passive:true});
+
+const touchEnd = e => {
+  for (const touch of e.changedTouches) {
+    if (touch.identifier === touchLookId) touchLookId = null;
+    if (touch.identifier === touchMoveId) { touchMoveId = null; touchMoveVec = {x:0, z:0}; }
+  }
+};
+renderer.domElement.addEventListener('touchend', touchEnd, {passive:true});
+renderer.domElement.addEventListener('touchcancel', touchEnd, {passive:true});
+
+const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+const moveDir = new THREE.Vector3();
+function updateWalk() {
+  if (activeCamIdx !== -1) return;
+  euler.set(pitch, yaw, 0); walkCamera.quaternion.setFromEuler(euler);
+  moveDir.set(0, 0, 0);
+  if (keys['KeyW']||keys['ArrowUp'])    moveDir.z -= 1;
+  if (keys['KeyS']||keys['ArrowDown'])  moveDir.z += 1;
+  if (keys['KeyA']||keys['ArrowLeft'])  moveDir.x -= 1;
+  if (keys['KeyD']||keys['ArrowRight']) moveDir.x += 1;
+  if (keys['Space'])                     moveDir.y += 1;
+  if (keys['ShiftLeft']||keys['ShiftRight']) moveDir.y -= 1;
+  // タッチ移動を加算
+  if (touchMoveVec.x !== 0 || touchMoveVec.z !== 0) {
+    moveDir.x += touchMoveVec.x;
+    moveDir.z += touchMoveVec.z;
+  }
+  if (moveDir.length() > 0) {
+    moveDir.normalize().multiplyScalar(moveSpeed).applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)));
+    walkCamera.position.add(moveDir);
+  }
+}
+
+// ===== PANEL / SECTION =====
+let panelOpen = false;
+window.togglePanel = function() {
+  panelOpen = !panelOpen;
+  document.getElementById('panel-left').classList.toggle('open', panelOpen);
+  document.getElementById('panel-toggle').classList.toggle('open', panelOpen);
+  document.getElementById('panel-toggle').textContent = panelOpen ? '✕' : '☰';
+};
+window.toggleSection = function(header) {
+  header.classList.toggle('open');
+  const body = header.nextElementSibling;
+  body.classList.toggle('open');
+};
+window.showLoadDialog = function() {
+  document.getElementById('overlay-msg').style.display = 'flex';
+  document.getElementById('lock-msg').style.display = 'none';
+  // モデル読み込み済みなら閉じるボタンを表示
+  document.getElementById('btn-close-overlay').style.display = loadedModel ? '' : 'none';
+};
+window.closeLoadDialog = function() {
+  document.getElementById('overlay-msg').style.display = 'none';
+  if (loadedModel) {
+    document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
   }
 };
 
-// --- UI LOGIC ---
-window.updateLighting = () => {
-  const getNum = (id) => parseFloat(document.getElementById(id).value);
-  const getVal = (id) => document.getElementById(id).value;
+// ===== LIGHTING ADJUST =====
+const LIGHT_DEFAULTS = {
+  exposure:0.95, dir:2.0, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
+  amb:0.15, ambColor:'#ffffff',
+  hemi:0.1, hemiSky:'#ffffff', hemiGnd:'#888866',
+  envmap:1.2, bloomStr:0.06, bloomTh:0.9
+};
+let dirLightDist = 50; // モデル読み込み時に更新
+let dirLightCenter = new THREE.Vector3();
 
-  const tone = getVal('sl-tone-type');
-  renderer.toneMapping = tone === 'Neutral' ? THREE.NeutralToneMapping : tone === 'ACESFilmic' ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
-  renderer.toneMappingExposure = getNum('sl-exposure');
+window.updateLighting = function() {
+  const v = (id) => parseFloat(document.getElementById(id).value);
+  const c = (id) => document.getElementById(id).value;
 
-  hemiLight.intensity = getNum('sl-hemi');
-  hemiLight.color.set(getVal('sl-hemi-sky'));
-  hemiLight.groundColor.set(getVal('sl-hemi-gnd'));
+  const exposure = v('sl-exposure');
+  const dir = v('sl-dir');
+  const dirColor = c('sl-dir-color');
+  const azimuth = v('sl-dir-azimuth');
+  const elevation = v('sl-dir-elevation');
+  const dirShadow = document.getElementById('sl-dir-shadow').checked;
+  const amb = v('sl-amb');
+  const ambColor = c('sl-amb-color');
+  const hemi = v('sl-hemi');
+  const hemiSky = c('sl-hemi-sky');
+  const hemiGnd = c('sl-hemi-gnd');
+  const env = v('sl-envmap');
+  const bStr = v('sl-bloom-str');
+  const bTh = v('sl-bloom-th');
 
-  const envRot = getNum('sl-env-rot') * Math.PI / 180;
-  scene.environmentRotation.y = envRot;
-  if (scene.backgroundRotation) scene.backgroundRotation.y = envRot;
+  renderer.toneMappingExposure = exposure;
 
-  const envInt = getNum('sl-envmap');
+  dirLight.intensity = dir;
+  dirLight.color.set(dirColor);
+  dirLight.castShadow = dirShadow;
+  // 方向を球面座標から計算
+  const azRad = azimuth * Math.PI / 180;
+  const elRad = elevation * Math.PI / 180;
+  dirLight.position.set(
+    dirLightCenter.x + dirLightDist * Math.cos(elRad) * Math.sin(azRad),
+    dirLightCenter.y + dirLightDist * Math.sin(elRad),
+    dirLightCenter.z + dirLightDist * Math.cos(elRad) * Math.cos(azRad)
+  );
+  dirLight.target.position.copy(dirLightCenter);
+  dirLight.target.updateMatrixWorld();
+
+  ambient.intensity = amb;
+  ambient.color.set(ambColor);
+
+  hemiLight.intensity = hemi;
+  hemiLight.color.set(hemiSky);
+  hemiLight.groundColor.set(hemiGnd);
+
+  bloomPass.strength = bStr;
+  bloomPass.threshold = bTh;
+
   if (loadedModel) {
-    loadedModel.traverse(n => {
-      if (n.isMesh && n.material) {
-        const ms = Array.isArray(n.material) ? n.material : [n.material];
-        ms.forEach(m => { if(m.envMapIntensity !== undefined) m.envMapIntensity = envInt; });
+    loadedModel.traverse(obj => {
+      if (obj.isMesh) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach(m => { if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) m.envMapIntensity = env; });
       }
     });
   }
 
-  bloomPass.strength = getNum('sl-bloom');
-
-  // Value display
-  document.getElementById('sv-exposure').textContent = getNum('sl-exposure').toFixed(1);
-  document.getElementById('sv-hemi').textContent = getNum('sl-hemi').toFixed(2);
-  document.getElementById('sv-envmap').textContent = envInt.toFixed(1);
-  document.getElementById('sv-env-rot').textContent = getVal('sl-env-rot') + '°';
-  document.getElementById('sv-bloom').textContent = getNum('sl-bloom').toFixed(2);
+  // 値表示を更新
+  document.getElementById('sv-exposure').textContent = exposure.toFixed(2);
+  document.getElementById('sv-dir').textContent = dir.toFixed(1);
+  document.getElementById('sv-dir-color').textContent = dirColor.substring(0,7);
+  document.getElementById('sv-dir-azimuth').textContent = azimuth + '°';
+  document.getElementById('sv-dir-elevation').textContent = elevation + '°';
+  document.getElementById('sv-amb').textContent = amb.toFixed(2);
+  document.getElementById('sv-amb-color').textContent = ambColor.substring(0,7);
+  document.getElementById('sv-hemi').textContent = hemi.toFixed(2);
+  document.getElementById('sv-hemi-sky').textContent = hemiSky.substring(0,7);
+  document.getElementById('sv-hemi-gnd').textContent = hemiGnd.substring(0,7);
+  document.getElementById('sv-envmap').textContent = env.toFixed(1);
+  document.getElementById('sv-bloom-str').textContent = bStr.toFixed(2);
+  document.getElementById('sv-bloom-th').textContent = bTh.toFixed(2);
 };
 
-// --- CONTROLS & ANIMATION ---
-let keys = {};
-let yaw = 0, pitch = 0;
+window.resetLighting = function() {
+  const d = LIGHT_DEFAULTS;
+  document.getElementById('sl-exposure').value = d.exposure;
+  document.getElementById('sl-dir').value = d.dir;
+  document.getElementById('sl-dir-color').value = d.dirColor;
+  document.getElementById('sl-dir-azimuth').value = d.dirAzimuth;
+  document.getElementById('sl-dir-elevation').value = d.dirElevation;
+  document.getElementById('sl-dir-shadow').checked = d.dirShadow;
+  document.getElementById('sl-amb').value = d.amb;
+  document.getElementById('sl-amb-color').value = d.ambColor;
+  document.getElementById('sl-hemi').value = d.hemi;
+  document.getElementById('sl-hemi-sky').value = d.hemiSky;
+  document.getElementById('sl-hemi-gnd').value = d.hemiGnd;
+  document.getElementById('sl-envmap').value = d.envmap;
+  document.getElementById('sl-bloom-str').value = d.bloomStr;
+  document.getElementById('sl-bloom-th').value = d.bloomTh;
+  updateLighting();
+};
 
-document.addEventListener('keydown', (e) => keys[e.code] = true);
-document.addEventListener('keyup', (e) => keys[e.code] = false);
-renderer.domElement.addEventListener('click', () => { if(activeCamIdx === -1) renderer.domElement.requestPointerLock(); });
-
-document.addEventListener('mousemove', (e) => {
-  if (document.pointerLockElement) {
-    yaw -= e.movementX * 0.002;
-    pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch - e.movementY * 0.002));
-  }
+// ===== RESIZE =====
+window.addEventListener('resize', () => {
+  walkCamera.aspect = window.innerWidth / window.innerHeight;
+  walkCamera.updateProjectionMatrix();
+  glbCameras.forEach(cam => { if (cam.isPerspectiveCamera) { cam.aspect = window.innerWidth / window.innerHeight; cam.updateProjectionMatrix(); } });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+  bloomPass.resolution.set(window.innerWidth, window.innerHeight);
 });
 
-document.addEventListener('pointerlockchange', () => {
-  const locked = !!document.pointerLockElement;
-  document.getElementById('crosshair').style.display = locked ? 'block' : 'none';
-  document.getElementById('lock-msg').style.display = locked ? 'none' : 'block';
-});
-
-function updateWalk() {
-  if (activeCamIdx !== -1 || !document.pointerLockElement) return;
-  const move = new THREE.Vector3();
-  if (keys['KeyW']) move.z -= 1;
-  if (keys['KeyS']) move.z += 1;
-  if (keys['KeyA']) move.x -= 1;
-  if (keys['KeyD']) move.x += 1;
-  
-  if (keys['Space']) walkCamera.position.y += 0.1;
-  if (keys['ShiftLeft']) walkCamera.position.y -= 0.1;
-
-  walkCamera.quaternion.setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
-  if (move.length() > 0) {
-    move.normalize().multiplyScalar(0.1).applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)));
-    walkCamera.position.add(move);
-  }
-}
-
+// ===== RENDER LOOP =====
 let lastTime = 0, frameCount = 0;
 function animate(time) {
   requestAnimationFrame(animate);
   updateWalk();
   renderPass.camera = activeCamera;
   composer.render();
-
   frameCount++;
   if (time - lastTime > 1000) {
     document.getElementById('fps-badge').textContent = frameCount + ' fps';
@@ -430,52 +852,17 @@ function animate(time) {
   }
 }
 
-// --- UTILS ---
-window.togglePanel = () => {
-  const p = document.getElementById('panel-left');
-  const b = document.getElementById('panel-toggle');
-  p.classList.toggle('open');
-  b.classList.toggle('open');
-};
-window.toggleSection = (el) => {
-  el.classList.toggle('open');
-  el.nextElementSibling.classList.toggle('open');
-};
-window.showLoadDialog = () => document.getElementById('overlay-msg').style.display = 'flex';
-window.closeLoadDialog = () => document.getElementById('overlay-msg').style.display = 'none';
-
-async function buildHDRPanel() {
-  const container = document.getElementById('hdr-presets');
-  try {
-    const res = await fetch(`https://api.github.com/repos/${window.location.hostname.split('.')[0]}/${window.location.pathname.split('/')[1]}/contents/hdr`);
-    if (!res.ok) throw new Error();
-    const files = await res.json();
-    HDR_PRESETS = files.filter(f => f.name.endsWith('.hdr')).map(f => ({ file: f.name }));
-    if (HDR_PRESETS.length > 0) loadHDR(0);
-  } catch(e) {
-    container.innerHTML = '<div style="font-size:9px; color:var(--muted)">Put .hdr files in /hdr/ folder</div>';
-  }
-  
-  HDR_PRESETS.forEach((p, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'hdr-preset-btn';
-    btn.textContent = p.file;
-    btn.onclick = () => loadHDR(i);
-    container.appendChild(btn);
-  });
-}
-
-window.addEventListener('resize', () => {
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
-  walkCamera.aspect = window.innerWidth / window.innerHeight;
-  walkCamera.updateProjectionMatrix();
-});
-
-// START
-buildHDRPanel();
+// ===== INIT =====
+buildHDRPanel(); // async、エラーは内部で処理
 animate(0);
 
+// Auto-load from URL
+const params = new URLSearchParams(window.location.search);
+const autoGlb = params.get('glb');
+if (autoGlb) {
+  document.getElementById('glb-url-input').value = autoGlb;
+  loadGLB(autoGlb, autoGlb);
+}
 </script>
 </body>
 </html>
