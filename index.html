@@ -636,7 +636,7 @@ function loadGLB(url, displayUrl) {
     document.getElementById('btn-reload').style.display = '';
     document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
     const parts = (displayUrl || url).split('/');
-    document.getElementById('model-name')?.textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb');
+    { const __el = document.getElementById('model-name'); if(__el) __el.textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb'); }
     activeCamera = walkCamera;
     activeCamIdx = -1;
     // GLBカメラがあれば最初のカメラ位置からスタート
@@ -697,7 +697,7 @@ window.switchCamera = function(idx) {
   const dirVal = isExterior ? 3 : LIGHT_DEFAULTS.dir;
   dirLight.intensity = dirVal;
   document.getElementById('sl-dir').value = dirVal;
-  document.getElementById('sv-dir')?.textContent = dirVal.toFixed(1);
+  { const __el = document.getElementById('sv-dir'); if(__el) __el.textContent = dirVal.toFixed(1); }
 
   // カメラ位置に最も近いSpotLight 6個の影を有効化
   if (window._emissiveLights && window._emissiveLights.length > 0) {
@@ -819,7 +819,7 @@ window.togglePanel = function() {
   panelOpen = !panelOpen;
   document.getElementById('panel-left').classList.toggle('open', panelOpen);
   document.getElementById('panel-toggle').classList.toggle('open', panelOpen);
-  document.getElementById('panel-toggle')?.textContent = panelOpen ? '✕' : '☰';
+  { const __el = document.getElementById('panel-toggle'); if(__el) __el.textContent = panelOpen ? '✕' : '☰'; }
 };
 window.toggleSection = function(header) {
   header.classList.toggle('open');
@@ -914,20 +914,20 @@ window.updateLighting = function() {
   }
 
   // 値表示を更新
-  document.getElementById('sv-exposure')?.textContent = exposure.toFixed(2);
-  document.getElementById('sv-dir')?.textContent = dir.toFixed(1);
-  document.getElementById('sv-dir-color')?.textContent = dirColor.substring(0,7);
-  document.getElementById('sv-dir-azimuth')?.textContent = azimuth + '°';
-  document.getElementById('sv-dir-elevation')?.textContent = elevation + '°';
-  document.getElementById('sv-amb')?.textContent = amb.toFixed(2);
-  document.getElementById('sv-amb-color')?.textContent = ambColor.substring(0,7);
-  document.getElementById('sv-hemi')?.textContent = hemi.toFixed(2);
-  document.getElementById('sv-hemi-sky')?.textContent = hemiSky.substring(0,7);
-  document.getElementById('sv-hemi-gnd')?.textContent = hemiGnd.substring(0,7);
-  document.getElementById('sv-envmap')?.textContent = env.toFixed(1);
-  document.getElementById('sv-emissive-mul')?.textContent = emMul.toFixed(1);
-  document.getElementById('sv-bloom-str')?.textContent = bStr.toFixed(2);
-  document.getElementById('sv-bloom-th')?.textContent = bTh.toFixed(2);
+  { const __el = document.getElementById('sv-exposure'); if(__el) __el.textContent = exposure.toFixed(2); }
+  { const __el = document.getElementById('sv-dir'); if(__el) __el.textContent = dir.toFixed(1); }
+  { const __el = document.getElementById('sv-dir-color'); if(__el) __el.textContent = dirColor.substring(0,7); }
+  { const __el = document.getElementById('sv-dir-azimuth'); if(__el) __el.textContent = azimuth + '°'; }
+  { const __el = document.getElementById('sv-dir-elevation'); if(__el) __el.textContent = elevation + '°'; }
+  { const __el = document.getElementById('sv-amb'); if(__el) __el.textContent = amb.toFixed(2); }
+  { const __el = document.getElementById('sv-amb-color'); if(__el) __el.textContent = ambColor.substring(0,7); }
+  { const __el = document.getElementById('sv-hemi'); if(__el) __el.textContent = hemi.toFixed(2); }
+  { const __el = document.getElementById('sv-hemi-sky'); if(__el) __el.textContent = hemiSky.substring(0,7); }
+  { const __el = document.getElementById('sv-hemi-gnd'); if(__el) __el.textContent = hemiGnd.substring(0,7); }
+  { const __el = document.getElementById('sv-envmap'); if(__el) __el.textContent = env.toFixed(1); }
+  { const __el = document.getElementById('sv-emissive-mul'); if(__el) __el.textContent = emMul.toFixed(1); }
+  { const __el = document.getElementById('sv-bloom-str'); if(__el) __el.textContent = bStr.toFixed(2); }
+  { const __el = document.getElementById('sv-bloom-th'); if(__el) __el.textContent = bTh.toFixed(2); }
 };
 
 window.resetLighting = function() {
@@ -982,7 +982,6 @@ function updateEmissiveSpotCulling(cam) {
     l.visible = active;
     if (!active) { l.intensity = 0; continue; }
     l.intensity = l.userData.baseIntensity * mul;
-    // 近い順に6つだけ影をON
     for (let k = 0; k < 6; k++) {
       if (d2 < bestD2[k]) {
         for (let j = 5; j > k; j--) { bestD2[j] = bestD2[j-1]; bestL[j] = bestL[j-1]; }
@@ -1004,7 +1003,7 @@ function animate(time) {
   composer.render();
   frameCount++;
   if (time - lastTime > 1000) {
-    document.getElementById('fps-badge')?.textContent = frameCount + ' fps';
+    { const __el = document.getElementById('fps-badge'); if(__el) __el.textContent = frameCount + ' fps'; }
     frameCount = 0; lastTime = time;
   }
 }
