@@ -577,7 +577,10 @@ function loadGLB(url, displayUrl) {
     toPlace.forEach(c => {
       const pl = new THREE.PointLight(c.color, c.intensity, c.distance);
       pl.position.copy(c.pos);
-      pl.castShadow = false;
+      pl.castShadow = true;
+      pl.shadow.mapSize.width = 512;
+      pl.shadow.mapSize.height = 512;
+      pl.shadow.bias = -0.002;
       pl.userData.baseIntensity = c.intensity;
       scene.add(pl);
       window._emissiveLights.push(pl);
