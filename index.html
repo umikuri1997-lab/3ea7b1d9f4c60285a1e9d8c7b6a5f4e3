@@ -538,10 +538,10 @@ function loadGLB(url, displayUrl) {
     });
     scene.add(gltf.scene);
 
-    // Emissive → PointLight 自動生成
+    // Emissive → SpotLight 自動生成（下向き照射）
     // 前回のemissiveライトをクリア
     if (window._emissiveLights) {
-      window._emissiveLights.forEach(l => scene.remove(l));
+      window._emissiveLights.forEach(l => { scene.remove(l); if(l.target) scene.remove(l.target); });
     }
     window._emissiveLights = [];
     const emissiveThreshold = 100;
@@ -556,7 +556,6 @@ function loadGLB(url, displayUrl) {
         if (intensity >= emissiveThreshold && mat.emissive) {
           const pos = new THREE.Vector3();
           obj.getWorldPosition(pos);
-          // メッシュのバウンディングボックスからサイズを推定
           const bb = new THREE.Box3().setFromObject(obj);
           const sz = bb.getSize(new THREE.Vector3());
           const radius = Math.max(sz.x, sz.y, sz.z) * 3;
@@ -575,18 +574,21 @@ function loadGLB(url, displayUrl) {
     emissiveCandidates.sort((a, b) => b.intensity - a.intensity);
     const toPlace = emissiveCandidates.slice(0, maxEmissiveLights);
     toPlace.forEach(c => {
-      const pl = new THREE.PointLight(c.color, c.intensity, c.distance);
-      pl.position.copy(c.pos);
-      pl.castShadow = true;
-      pl.shadow.mapSize.width = 512;
-      pl.shadow.mapSize.height = 512;
-      pl.shadow.bias = -0.002;
-      pl.userData.baseIntensity = c.intensity;
-      scene.add(pl);
-      window._emissiveLights.push(pl);
+      const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, Math.PI / 3, 0.5);
+      sl.position.copy(c.pos);
+      sl.castShadow = true;
+      sl.shadow.mapSize.width = 512;
+      sl.shadow.mapSize.height = 512;
+      sl.shadow.bias = -0.002;
+      sl.userData.baseIntensity = c.intensity;
+      // ターゲットを真下に
+      sl.target.position.set(c.pos.x, c.pos.y - 1, c.pos.z);
+      scene.add(sl);
+      scene.add(sl.target);
+      window._emissiveLights.push(sl);
     });
     if (toPlace.length > 0) {
-      console.log(`EmissiveLight: ${toPlace.length}個配置（候補${emissiveCandidates.length}個）`);
+      console.log(`EmissiveSpotLight: ${toPlace.length}個配置（候補${emissiveCandidates.length}個）`);
     }
 
     // Cameras
