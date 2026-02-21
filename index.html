@@ -160,8 +160,8 @@
         <div class="slider-group-label">▸ トーンマッピング</div>
         <div class="slider-row">
           <label>露出</label>
-          <input type="range" min="0.1" max="3" step="0.05" value="1.0" id="sl-exposure" oninput="updateLighting()">
-          <span class="slider-val" id="sv-exposure">1.00</span>
+          <input type="range" min="0.1" max="3" step="0.05" value="0.3" id="sl-exposure" oninput="updateLighting()">
+          \10.30\3
         </div>
 
         <div class="slider-group-label">▸ 直射光 (Directional)</div>
@@ -182,8 +182,8 @@
         </div>
         <div class="slider-row">
           <label>仰角</label>
-          <input type="range" min="5" max="90" step="1" value="60" id="sl-dir-elevation" oninput="updateLighting()">
-          <span class="slider-val" id="sv-dir-elevation">60°</span>
+          <input type="range" min="5" max="90" step="1" value="45" id="sl-dir-elevation" oninput="updateLighting()">
+          \145°\3
         </div>
         <div class="hdr-toggle-row" style="padding:4px 16px 8px">
           <span class="hdr-toggle-label">影</span>
@@ -196,8 +196,8 @@
         <div class="slider-group-label">▸ 環境光 (Ambient)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="5" step="0.01" value="1" id="sl-amb" oninput="updateLighting()">
-          <span class="slider-val" id="sv-amb">1.00</span>
+          <input type="range" min="0" max="5" step="0.01" value="2" id="sl-amb" oninput="updateLighting()">
+          \12.00\3
         </div>
         <div class="slider-row">
           <label>色</label>
@@ -208,8 +208,8 @@
         <div class="slider-group-label">▸ 半球光 (Hemisphere)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="2" step="0.01" value="1" id="sl-hemi" oninput="updateLighting()">
-          <span class="slider-val" id="sv-hemi">1.00</span>
+          <input type="range" min="0" max="2" step="0.01" value="2" id="sl-hemi" oninput="updateLighting()">
+          \12.00\3
         </div>
         <div class="slider-row">
           <label>天空色</label>
@@ -230,8 +230,8 @@
         </div>
         <div class="slider-row">
           <label>放射光 強度</label>
-          <input type="range" min="0" max="10" step="0.1" value="1.0" id="sl-emissive-mul" oninput="updateLighting()">
-          <span class="slider-val" id="sv-emissive-mul">1.0</span>
+          <input type="range" min="0" max="10" step="0.1" value="2.0" id="sl-emissive-mul" oninput="updateLighting()">
+          \12.0\3
         </div>
         <div class="slider-row">
           <label>Bloom 強度</label>
@@ -308,7 +308,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 0.3;
 container.appendChild(renderer.domElement);
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
@@ -334,7 +334,7 @@ composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 
 // ===== LIGHTING =====
-const ambient = new THREE.AmbientLight(0xffffff, 1);
+const ambient = new THREE.AmbientLight(0xffffff, 2);
 scene.add(ambient);
 
 const dirLight = new THREE.DirectionalLight(0xffffff, 10);
@@ -353,7 +353,7 @@ dirLight.shadow.bias           = -0.0005;
 dirLight.shadow.normalBias     = 0.02;
 scene.add(dirLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 1);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 2);
 scene.add(hemiLight);
 
 // ===== HDR =====
@@ -382,6 +382,15 @@ pmremGenerator.compileEquirectangularShader();
 let currentEnvMap = null;
 let currentBgMap = null;
 let hdrBgEnabled = true;
+const HDR_BG_BASE_INTENSITY = 1.0;
+function updateBackgroundIntensity() {
+  // 露出(トーンマッピング露出)の変更がHDR背景の見た目の明るさに影響しないよう補正
+  if (hdrBgEnabled && currentBgMap) {
+    const exp = renderer.toneMappingExposure || 1.0;
+    scene.backgroundIntensity = HDR_BG_BASE_INTENSITY / exp;
+  }
+}
+
 let activeHdrIdx = -1;
 let HDR_PRESETS = [];
 
@@ -458,7 +467,7 @@ function loadHDR(idx) {
       scene.environment = currentEnvMap;
       if (hdrBgEnabled) {
         scene.background = currentBgMap;
-        scene.backgroundIntensity = 1.0;
+        updateBackgroundIntensity();
       }
       resolve();
     }, undefined, (err) => {
@@ -472,7 +481,7 @@ window.toggleHDRBackground = function() {
   hdrBgEnabled = document.getElementById('hdr-bg-toggle').checked;
   if (hdrBgEnabled && currentBgMap) {
     scene.background = currentBgMap;
-    scene.backgroundIntensity = 1.0;
+    updateBackgroundIntensity();
     scene.fog = null;
   } else {
     scene.background = new THREE.Color(0x0a0a0b);
@@ -832,10 +841,10 @@ window.closeLoadDialog = function() {
 
 // ===== LIGHTING ADJUST =====
 const LIGHT_DEFAULTS = {
-  exposure:1.0, dir:10, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
-  amb:1, ambColor:'#ffffff',
-  hemi:1, hemiSky:'#ffffff', hemiGnd:'#ffffff',
-  envmap:0.5, emissiveMul:1.0, bloomStr:0.03, bloomTh:0.9
+  exposure:0.3, dir:10, dirColor:'#ffffff', dirAzimuth:45, dirElevation:45, dirShadow:true,
+  amb:2, ambColor:'#ffffff',
+  hemi:2, hemiSky:'#ffffff', hemiGnd:'#ffffff',
+  envmap:0.5, emissiveMul:2.0, bloomStr:0.03, bloomTh:0.9
 };
 let dirLightDist = 50; // モデル読み込み時に更新
 let dirLightCenter = new THREE.Vector3();
@@ -861,6 +870,7 @@ window.updateLighting = function() {
   const bTh = v('sl-bloom-th');
 
   renderer.toneMappingExposure = exposure;
+ updateBackgroundIntensity();
 
   dirLight.intensity = dir;
   dirLight.color.set(dirColor);
