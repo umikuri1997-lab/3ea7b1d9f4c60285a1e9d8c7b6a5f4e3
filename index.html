@@ -229,6 +229,16 @@
           <span class="slider-val" id="sv-envmap">1.5</span>
         </div>
         <div class="slider-row">
+          <label>SSAO 半径</label>
+          <input type="range" min="0.05" max="2" step="0.05" value="0.5" id="sl-ssao-rad" oninput="updateLighting()">
+          <span class="slider-val" id="sv-ssao-rad">0.50</span>
+        </div>
+        <div class="slider-row">
+          <label>SSAO 範囲</label>
+          <input type="range" min="0.01" max="0.5" step="0.01" value="0.15" id="sl-ssao-dist" oninput="updateLighting()">
+          <span class="slider-val" id="sv-ssao-dist">0.15</span>
+        </div>
+        <div class="slider-row">
           <label>Bloom 強度</label>
           <input type="range" min="0" max="0.5" step="0.01" value="0.06" id="sl-bloom-str" oninput="updateLighting()">
           <span class="slider-val" id="sv-bloom-str">0.06</span>
@@ -291,6 +301,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
@@ -316,10 +327,18 @@ let activeCamera = walkCamera;
 let glbCameras = [];
 let activeCamIdx = -1;
 
-// ===== POST-PROCESSING (Bloom) =====
+// ===== POST-PROCESSING =====
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, walkCamera);
 composer.addPass(renderPass);
+
+// SSAO – 室内の角や接地面に自然な陰影
+const ssaoPass = new SSAOPass(scene, walkCamera, window.innerWidth, window.innerHeight);
+ssaoPass.kernelRadius = 0.5;
+ssaoPass.minDistance = 0.001;
+ssaoPass.maxDistance = 0.15;
+composer.addPass(ssaoPass);
+
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
   0.06,   // strength – ごく控えめなグロー
@@ -769,7 +788,8 @@ const LIGHT_DEFAULTS = {
   exposure:1.0, dir:3.0, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
   amb:0.8, ambColor:'#ffffff',
   hemi:0, hemiSky:'#ffffff', hemiGnd:'#ffffff',
-  envmap:1.5, bloomStr:0.06, bloomTh:0.9
+  envmap:1.5, ssaoRad:0.5, ssaoDist:0.15,
+  bloomStr:0.06, bloomTh:0.9
 };
 let dirLightDist = 50; // モデル読み込み時に更新
 let dirLightCenter = new THREE.Vector3();
@@ -790,6 +810,8 @@ window.updateLighting = function() {
   const hemiSky = c('sl-hemi-sky');
   const hemiGnd = c('sl-hemi-gnd');
   const env = v('sl-envmap');
+  const ssaoRad = v('sl-ssao-rad');
+  const ssaoDist = v('sl-ssao-dist');
   const bStr = v('sl-bloom-str');
   const bTh = v('sl-bloom-th');
 
@@ -819,6 +841,9 @@ window.updateLighting = function() {
   bloomPass.strength = bStr;
   bloomPass.threshold = bTh;
 
+  ssaoPass.kernelRadius = ssaoRad;
+  ssaoPass.maxDistance = ssaoDist;
+
   if (loadedModel) {
     loadedModel.traverse(obj => {
       if (obj.isMesh) {
@@ -840,6 +865,8 @@ window.updateLighting = function() {
   document.getElementById('sv-hemi-sky').textContent = hemiSky.substring(0,7);
   document.getElementById('sv-hemi-gnd').textContent = hemiGnd.substring(0,7);
   document.getElementById('sv-envmap').textContent = env.toFixed(1);
+  document.getElementById('sv-ssao-rad').textContent = ssaoRad.toFixed(2);
+  document.getElementById('sv-ssao-dist').textContent = ssaoDist.toFixed(2);
   document.getElementById('sv-bloom-str').textContent = bStr.toFixed(2);
   document.getElementById('sv-bloom-th').textContent = bTh.toFixed(2);
 };
@@ -858,6 +885,8 @@ window.resetLighting = function() {
   document.getElementById('sl-hemi-sky').value = d.hemiSky;
   document.getElementById('sl-hemi-gnd').value = d.hemiGnd;
   document.getElementById('sl-envmap').value = d.envmap;
+  document.getElementById('sl-ssao-rad').value = d.ssaoRad;
+  document.getElementById('sl-ssao-dist').value = d.ssaoDist;
   document.getElementById('sl-bloom-str').value = d.bloomStr;
   document.getElementById('sl-bloom-th').value = d.bloomTh;
   updateLighting();
@@ -871,6 +900,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
   bloomPass.resolution.set(window.innerWidth, window.innerHeight);
+  ssaoPass.setSize(window.innerWidth, window.innerHeight);
 });
 
 // ===== RENDER LOOP =====
@@ -879,6 +909,7 @@ function animate(time) {
   requestAnimationFrame(animate);
   updateWalk();
   renderPass.camera = activeCamera;
+  ssaoPass.camera = activeCamera;
   composer.render();
   frameCount++;
   if (time - lastTime > 1000) {
