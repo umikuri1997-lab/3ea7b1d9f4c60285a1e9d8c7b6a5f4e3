@@ -294,7 +294,7 @@ async function removeLights(buf){
     const indexMap = new Array(lights.length).fill(-1);
     const newLights = [];
     lights.forEach((light, i) => {
-      const isSpot = /spot/i.test(light.name || '') || light.type === 'spot';
+      const isSpot = /spot/i.test(light.name || '');
       if(isSpot){
         indexMap[i] = newLights.length;
         newLights.push(light);
