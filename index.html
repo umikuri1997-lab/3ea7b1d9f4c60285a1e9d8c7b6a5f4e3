@@ -573,13 +573,18 @@ function loadGLB(url, displayUrl) {
     // 強い順にソートして上限まで配置
     emissiveCandidates.sort((a, b) => b.intensity - a.intensity);
     const toPlace = emissiveCandidates.slice(0, maxEmissiveLights);
-    toPlace.forEach(c => {
+    toPlace.forEach((c, i) => {
       const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, Math.PI / 3, 0.5);
       sl.position.copy(c.pos);
-      sl.castShadow = true;
-      sl.shadow.mapSize.width = 512;
-      sl.shadow.mapSize.height = 512;
-      sl.shadow.bias = -0.002;
+      // 影付きは最大6個（DirectionalLight+マテリアルテクスチャ分を確保）
+      if (i < 6) {
+        sl.castShadow = true;
+        sl.shadow.mapSize.width = 512;
+        sl.shadow.mapSize.height = 512;
+        sl.shadow.bias = -0.002;
+      } else {
+        sl.castShadow = false;
+      }
       sl.userData.baseIntensity = c.intensity;
       // ターゲットを真下に
       sl.target.position.set(c.pos.x, c.pos.y - 1, c.pos.z);
@@ -588,7 +593,7 @@ function loadGLB(url, displayUrl) {
       window._emissiveLights.push(sl);
     });
     if (toPlace.length > 0) {
-      console.log(`EmissiveSpotLight: ${toPlace.length}個配置（候補${emissiveCandidates.length}個）`);
+      console.log(`EmissiveSpotLight: ${toPlace.length}個配置（影付き${Math.min(toPlace.length,6)}個 / 候補${emissiveCandidates.length}個）`);
     }
 
     // Cameras
