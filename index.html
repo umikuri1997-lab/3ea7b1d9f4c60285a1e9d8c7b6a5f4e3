@@ -160,8 +160,8 @@
         <div class="slider-group-label">▸ トーンマッピング</div>
         <div class="slider-row">
           <label>露出</label>
-          <input type="range" min="0.1" max="3" step="0.05" value="0.3" id="sl-exposure" oninput="updateLighting()">
-          \10.30\3
+          <input type="range" min="0.1" max="3" step="0.05" value="1.0" id="sl-exposure" oninput="updateLighting()">
+          <span class="slider-val" id="sv-exposure">1.00</span>
         </div>
 
         <div class="slider-group-label">▸ 直射光 (Directional)</div>
@@ -182,8 +182,8 @@
         </div>
         <div class="slider-row">
           <label>仰角</label>
-          <input type="range" min="5" max="90" step="1" value="45" id="sl-dir-elevation" oninput="updateLighting()">
-          \145°\3
+          <input type="range" min="5" max="90" step="1" value="60" id="sl-dir-elevation" oninput="updateLighting()">
+          <span class="slider-val" id="sv-dir-elevation">60°</span>
         </div>
         <div class="hdr-toggle-row" style="padding:4px 16px 8px">
           <span class="hdr-toggle-label">影</span>
@@ -196,8 +196,8 @@
         <div class="slider-group-label">▸ 環境光 (Ambient)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="5" step="0.01" value="2" id="sl-amb" oninput="updateLighting()">
-          \12.00\3
+          <input type="range" min="0" max="5" step="0.01" value="1" id="sl-amb" oninput="updateLighting()">
+          <span class="slider-val" id="sv-amb">1.00</span>
         </div>
         <div class="slider-row">
           <label>色</label>
@@ -208,8 +208,8 @@
         <div class="slider-group-label">▸ 半球光 (Hemisphere)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="2" step="0.01" value="2" id="sl-hemi" oninput="updateLighting()">
-          \12.00\3
+          <input type="range" min="0" max="2" step="0.01" value="1" id="sl-hemi" oninput="updateLighting()">
+          <span class="slider-val" id="sv-hemi">1.00</span>
         </div>
         <div class="slider-row">
           <label>天空色</label>
@@ -230,8 +230,8 @@
         </div>
         <div class="slider-row">
           <label>放射光 強度</label>
-          <input type="range" min="0" max="10" step="0.1" value="2.0" id="sl-emissive-mul" oninput="updateLighting()">
-          \12.0\3
+          <input type="range" min="0" max="10" step="0.1" value="1.0" id="sl-emissive-mul" oninput="updateLighting()">
+          <span class="slider-val" id="sv-emissive-mul">1.0</span>
         </div>
         <div class="slider-row">
           <label>Bloom 強度</label>
@@ -308,7 +308,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.3;
+renderer.toneMappingExposure = 1.0;
 container.appendChild(renderer.domElement);
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
@@ -334,7 +334,7 @@ composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 
 // ===== LIGHTING =====
-const ambient = new THREE.AmbientLight(0xffffff, 2);
+const ambient = new THREE.AmbientLight(0xffffff, 1);
 scene.add(ambient);
 
 const dirLight = new THREE.DirectionalLight(0xffffff, 10);
@@ -353,7 +353,7 @@ dirLight.shadow.bias           = -0.0005;
 dirLight.shadow.normalBias     = 0.02;
 scene.add(dirLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 2);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 1);
 scene.add(hemiLight);
 
 // ===== HDR =====
@@ -382,15 +382,6 @@ pmremGenerator.compileEquirectangularShader();
 let currentEnvMap = null;
 let currentBgMap = null;
 let hdrBgEnabled = true;
-const HDR_BG_BASE_INTENSITY = 1.0;
-function updateBackgroundIntensity() {
-  // 露出変更がHDR背景の見た目の明るさに影響しないよう補正
-  if (hdrBgEnabled && currentBgMap) {
-    const exp = renderer.toneMappingExposure || 1.0;
-    scene.backgroundIntensity = HDR_BG_BASE_INTENSITY / exp;
-  }
-}
-
 let activeHdrIdx = -1;
 let HDR_PRESETS = [];
 
@@ -467,7 +458,7 @@ function loadHDR(idx) {
       scene.environment = currentEnvMap;
       if (hdrBgEnabled) {
         scene.background = currentBgMap;
-        updateBackgroundIntensity();
+        scene.backgroundIntensity = 1.0;
       }
       resolve();
     }, undefined, (err) => {
@@ -481,7 +472,7 @@ window.toggleHDRBackground = function() {
   hdrBgEnabled = document.getElementById('hdr-bg-toggle').checked;
   if (hdrBgEnabled && currentBgMap) {
     scene.background = currentBgMap;
-    updateBackgroundIntensity();
+    scene.backgroundIntensity = 1.0;
     scene.fog = null;
   } else {
     scene.background = new THREE.Color(0x0a0a0b);
@@ -614,7 +605,6 @@ function loadGLB(url, displayUrl) {
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
- _updateSpotCullRadiusFromModel(maxDim);
     dirLight.shadow.camera.left   = -maxDim;
     dirLight.shadow.camera.right  =  maxDim;
     dirLight.shadow.camera.top    =  maxDim;
@@ -629,8 +619,6 @@ function loadGLB(url, displayUrl) {
     const eyeH = size.y * 0.35 + box.min.y;
     walkCamera.position.set(center.x + Math.max(size.x, size.z) * 0.4, eyeH, center.z + Math.max(size.x, size.z) * 0.4);
     walkCamera.lookAt(center);
- // モデル読み込み直後（初期視点）で一度だけ判定
- updateEmissiveSpotCulling(walkCamera);
     yaw = -Math.PI / 4; pitch = 0;
 
     buildCameraList();
@@ -639,7 +627,7 @@ function loadGLB(url, displayUrl) {
     document.getElementById('btn-reload').style.display = '';
     document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
     const parts = (displayUrl || url).split('/');
-    { const __el = document.getElementById('model-name'); if(__el) __el.textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb'); }
+    document.getElementById('model-name').textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb');
     activeCamera = walkCamera;
     activeCamIdx = -1;
     // GLBカメラがあれば最初のカメラ位置からスタート
@@ -694,16 +682,13 @@ window.switchCamera = function(idx) {
     yaw = Math.atan2(-dir.x, -dir.z);
     pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
   }
-  // ここで『切り替え先カメラ位置』からスポットライトを判定
-  updateEmissiveSpotCulling(walkCamera);
-
 
   // 外観・外部カメラはディレクショナルライトを抑える
   const isExterior = /外観|外部/.test(camName);
   const dirVal = isExterior ? 3 : LIGHT_DEFAULTS.dir;
   dirLight.intensity = dirVal;
   document.getElementById('sl-dir').value = dirVal;
-  { const __el = document.getElementById('sv-dir'); if(__el) __el.textContent = dirVal.toFixed(1); }
+  document.getElementById('sv-dir').textContent = dirVal.toFixed(1);
 
   // カメラ位置に最も近いSpotLight 6個の影を有効化
   if (window._emissiveLights && window._emissiveLights.length > 0) {
@@ -825,7 +810,7 @@ window.togglePanel = function() {
   panelOpen = !panelOpen;
   document.getElementById('panel-left').classList.toggle('open', panelOpen);
   document.getElementById('panel-toggle').classList.toggle('open', panelOpen);
-  { const __el = document.getElementById('panel-toggle'); if(__el) __el.textContent = panelOpen ? '✕' : '☰'; }
+  document.getElementById('panel-toggle').textContent = panelOpen ? '✕' : '☰';
 };
 window.toggleSection = function(header) {
   header.classList.toggle('open');
@@ -847,13 +832,11 @@ window.closeLoadDialog = function() {
 
 // ===== LIGHTING ADJUST =====
 const LIGHT_DEFAULTS = {
-  exposure:0.3, dir:10, dirColor:'#ffffff', dirAzimuth:45, dirElevation:45, dirShadow:true,
-  amb:2, ambColor:'#ffffff',
-  hemi:2, hemiSky:'#ffffff', hemiGnd:'#ffffff',
-  envmap:0.5, emissiveMul:2.0, bloomStr:0.03, bloomTh:0.9
+  exposure:1.0, dir:10, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
+  amb:1, ambColor:'#ffffff',
+  hemi:1, hemiSky:'#ffffff', hemiGnd:'#ffffff',
+  envmap:0.5, emissiveMul:1.0, bloomStr:0.03, bloomTh:0.9
 };
-window._currentEmMul = LIGHT_DEFAULTS.emissiveMul;
-
 let dirLightDist = 50; // モデル読み込み時に更新
 let dirLightCenter = new THREE.Vector3();
 
@@ -874,12 +857,10 @@ window.updateLighting = function() {
   const hemiGnd = c('sl-hemi-gnd');
   const env = v('sl-envmap');
   const emMul = v('sl-emissive-mul');
- window._currentEmMul = emMul;
   const bStr = v('sl-bloom-str');
   const bTh = v('sl-bloom-th');
 
   renderer.toneMappingExposure = exposure;
- updateBackgroundIntensity();
 
   dirLight.intensity = dir;
   dirLight.color.set(dirColor);
@@ -920,20 +901,20 @@ window.updateLighting = function() {
   }
 
   // 値表示を更新
-  { const __el = document.getElementById('sv-exposure'); if(__el) __el.textContent = exposure.toFixed(2); }
-  { const __el = document.getElementById('sv-dir'); if(__el) __el.textContent = dir.toFixed(1); }
-  { const __el = document.getElementById('sv-dir-color'); if(__el) __el.textContent = dirColor.substring(0,7); }
-  { const __el = document.getElementById('sv-dir-azimuth'); if(__el) __el.textContent = azimuth + '°'; }
-  { const __el = document.getElementById('sv-dir-elevation'); if(__el) __el.textContent = elevation + '°'; }
-  { const __el = document.getElementById('sv-amb'); if(__el) __el.textContent = amb.toFixed(2); }
-  { const __el = document.getElementById('sv-amb-color'); if(__el) __el.textContent = ambColor.substring(0,7); }
-  { const __el = document.getElementById('sv-hemi'); if(__el) __el.textContent = hemi.toFixed(2); }
-  { const __el = document.getElementById('sv-hemi-sky'); if(__el) __el.textContent = hemiSky.substring(0,7); }
-  { const __el = document.getElementById('sv-hemi-gnd'); if(__el) __el.textContent = hemiGnd.substring(0,7); }
-  { const __el = document.getElementById('sv-envmap'); if(__el) __el.textContent = env.toFixed(1); }
-  { const __el = document.getElementById('sv-emissive-mul'); if(__el) __el.textContent = emMul.toFixed(1); }
-  { const __el = document.getElementById('sv-bloom-str'); if(__el) __el.textContent = bStr.toFixed(2); }
-  { const __el = document.getElementById('sv-bloom-th'); if(__el) __el.textContent = bTh.toFixed(2); }
+  document.getElementById('sv-exposure').textContent = exposure.toFixed(2);
+  document.getElementById('sv-dir').textContent = dir.toFixed(1);
+  document.getElementById('sv-dir-color').textContent = dirColor.substring(0,7);
+  document.getElementById('sv-dir-azimuth').textContent = azimuth + '°';
+  document.getElementById('sv-dir-elevation').textContent = elevation + '°';
+  document.getElementById('sv-amb').textContent = amb.toFixed(2);
+  document.getElementById('sv-amb-color').textContent = ambColor.substring(0,7);
+  document.getElementById('sv-hemi').textContent = hemi.toFixed(2);
+  document.getElementById('sv-hemi-sky').textContent = hemiSky.substring(0,7);
+  document.getElementById('sv-hemi-gnd').textContent = hemiGnd.substring(0,7);
+  document.getElementById('sv-envmap').textContent = env.toFixed(1);
+  document.getElementById('sv-emissive-mul').textContent = emMul.toFixed(1);
+  document.getElementById('sv-bloom-str').textContent = bStr.toFixed(2);
+  document.getElementById('sv-bloom-th').textContent = bTh.toFixed(2);
 };
 
 window.resetLighting = function() {
@@ -966,67 +947,16 @@ window.addEventListener('resize', () => {
   bloomPass.resolution.set(window.innerWidth, window.innerHeight);
 });
 
-// ===== SPOTLIGHT CULLING (Emissive SpotLights) =====
-// 半径は『メートル』指定。モデルの単位（m/cm/mm）を推定してシーン単位へ変換
-const SPOT_CULL_RADIUS_METERS = 5;
-let _metersPerUnit = 1.0; // 1unitが何mか（推定）
-let _spotCullRadiusUnits = SPOT_CULL_RADIUS_METERS;
-let _spotCullRadius2 = _spotCullRadiusUnits * _spotCullRadiusUnits;
-function _updateSpotCullRadiusFromModel(maxDimUnits) {
-  // heuristic: very large models are often authored in cm or mm
-  if (maxDimUnits > 1000) _metersPerUnit = 0.001;
-  else if (maxDimUnits > 100) _metersPerUnit = 0.01;
-  else _metersPerUnit = 1.0;
-  _spotCullRadiusUnits = SPOT_CULL_RADIUS_METERS / _metersPerUnit;
-  _spotCullRadius2 = _spotCullRadiusUnits * _spotCullRadiusUnits;
-}
-
-// カメラから半径5m(シーン単位)以内のみ有効化して負荷を軽減
-const SPOT_CULL_RADIUS = 5;
-const _spotCullRadius2 = SPOT_CULL_RADIUS * SPOT_CULL_RADIUS;
-const SPOT_CULL_INTERVAL = 3; // 毎フレームではなく数フレームに1回
-let _spotCullTick = 0;
-const _tmpCamPos = new THREE.Vector3();
-function updateEmissiveSpotCulling(cam) {
-  const arr = window._emissiveLights;
-  if (!arr || arr.length === 0) return;
-  const camPos = cam.position;
-  // shadows off
-  for (let i = 0; i < arr.length; i++) arr[i].castShadow = false;
-  const bestD2 = [Infinity, Infinity, Infinity, Infinity, Infinity, Infinity];
-  const bestL  = [null, null, null, null, null, null];
-  const mul = (window._currentEmMul != null) ? window._currentEmMul : 1.0;
-  for (let i = 0; i < arr.length; i++) {
-    const l = arr[i];
-    const d2 = camPos.distanceToSquared(l.position);
-    const active = d2 <= _spotCullRadius2;
-    l.visible = active;
-    if (!active) { l.intensity = 0; continue; }
-    // baseIntensityが無い場合の保険
-    if (l.userData.baseIntensity == null) l.userData.baseIntensity = l.intensity;
-    l.intensity = l.userData.baseIntensity * mul;
-    for (let k = 0; k < 6; k++) {
-      if (d2 < bestD2[k]) {
-        for (let j = 5; j > k; j--) { bestD2[j] = bestD2[j-1]; bestL[j] = bestL[j-1]; }
-        bestD2[k] = d2; bestL[k] = l;
-        break;
-      }
-    }
-  }
-  for (let i = 0; i < 6; i++) if (bestL[i]) bestL[i].castShadow = true;
-}
-
-
 // ===== RENDER LOOP =====
 let lastTime = 0, frameCount = 0;
 function animate(time) {
   requestAnimationFrame(animate);
   updateWalk();
-renderPass.camera = activeCamera;
+  renderPass.camera = activeCamera;
   composer.render();
   frameCount++;
   if (time - lastTime > 1000) {
-    { const __el = document.getElementById('fps-badge'); if(__el) __el.textContent = frameCount + ' fps'; }
+    document.getElementById('fps-badge').textContent = frameCount + ' fps';
     frameCount = 0; lastTime = time;
   }
 }
