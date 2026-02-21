@@ -172,6 +172,10 @@
       <div><div class="option-label">日本語ファイル名を変換</div><div class="option-desc">日本語・記号含む場合タイムスタンプIDに変換</div></div>
     </div>
     <div class="option-row">
+      <label class="toggle"><input type="checkbox" id="opt-lights" checked><div class="toggle-slider"></div></label>
+      <div><div class="option-label">GLB内のライトを削除</div><div class="option-desc">大量ライトによる表示の重さを解消</div></div>
+    </div>
+    <div class="option-row">
       <label class="toggle"><input type="checkbox" id="opt-compress" checked><div class="toggle-slider"></div></label>
       <div><div class="option-label">テクスチャを圧縮</div><div class="option-desc">リサイズ＆圧縮（透過はPNG保持）</div></div>
     </div>
@@ -267,6 +271,29 @@ function toSafe(name){
   let a=base.replace(/[^\x00-\x7F]/g,'').replace(/[^a-zA-Z0-9_\-]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
   if(!a)a='model';
   return a+'_'+Date.now().toString(36).toUpperCase()+ext;
+}
+
+// LIGHT REMOVAL
+async function removeLights(buf){
+  const v=new DataView(buf);
+  if(v.getUint32(0,true)!==0x46546C67)throw new Error('GLBファイルではありません');
+  const ver=v.getUint32(4,true);
+  let off=12,jOff=-1,jLen=0,bOff=-1,bLen=0;
+  while(off<buf.byteLength){const cLen=v.getUint32(off,true),cType=v.getUint32(off+4,true);if(cType===0x4E4F534A){jOff=off+8;jLen=cLen;}else if(cType===0x004E4942){bOff=off;bLen=cLen;}off+=8+cLen;}
+  if(jOff<0)throw new Error('JSONチャンクなし');
+  const g=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,jOff,jLen)));
+  let n=0;
+  if(g.extensions?.KHR_lights_punctual){n+=(g.extensions.KHR_lights_punctual.lights||[]).length;delete g.extensions.KHR_lights_punctual;if(!Object.keys(g.extensions).length)delete g.extensions;}
+  ['extensionsUsed','extensionsRequired'].forEach(k=>{if(g[k]){g[k]=g[k].filter(e=>e!=='KHR_lights_punctual');if(!g[k].length)delete g[k];}});
+  (g.nodes||[]).forEach(nd=>{if(nd.extensions?.KHR_lights_punctual){n++;delete nd.extensions.KHR_lights_punctual;if(!Object.keys(nd.extensions).length)delete nd.extensions;}});
+  let js=JSON.stringify(g);while(js.length%4)js+=' ';
+  const jb=new TextEncoder().encode(js);
+  const tot=12+8+jb.length+(bOff>=0?8+bLen:0);
+  const ob=new ArrayBuffer(tot);const ov=new DataView(ob);const oa=new Uint8Array(ob);
+  ov.setUint32(0,0x46546C67,true);ov.setUint32(4,ver,true);ov.setUint32(8,tot,true);
+  ov.setUint32(12,jb.length,true);ov.setUint32(16,0x4E4F534A,true);oa.set(jb,20);
+  if(bOff>=0){const bs=20+jb.length;ov.setUint32(bs,bLen,true);ov.setUint32(bs+4,0x004E4942,true);oa.set(new Uint8Array(buf,bOff+8,bLen),bs+8);}
+  return{buffer:ob,count:n};
 }
 
 // TEXTURE COMPRESSION
@@ -496,6 +523,7 @@ async function uploadAll(){
   const btn=document.getElementById('btn-upload');
   btn.disabled=true;btn.textContent='アップロード中...';
   document.getElementById('log-area').classList.add('visible');
+  const doLights=document.getElementById('opt-lights').checked;
   const doCompress=document.getElementById('opt-compress').checked;
   const texMaxSize=parseInt(document.getElementById('opt-tex-size').value);
   const texQuality=parseFloat(document.getElementById('opt-tex-quality').value);
@@ -506,6 +534,10 @@ async function uploadAll(){
     const origSize=item.file.size;
     try{
       let buf=await item.file.arrayBuffer();setPb(item.id,15);
+      if(doLights){
+        try{const r=await removeLights(buf);buf=r.buffer;addLog(`  ライト ${r.count} 個削除`,r.count>0?'ok':'info');}
+        catch(e){addLog(`  ライト削除エラー: ${e.message}`,'err');}
+      }
       setPb(item.id,25);
       if(doCompress){
         try{
