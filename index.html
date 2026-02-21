@@ -196,8 +196,8 @@
         <div class="slider-group-label">▸ 環境光 (Ambient)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="5" step="0.01" value="0.3" id="sl-amb" oninput="updateLighting()">
-          <span class="slider-val" id="sv-amb">0.30</span>
+          <input type="range" min="0" max="5" step="0.01" value="0.8" id="sl-amb" oninput="updateLighting()">
+          <span class="slider-val" id="sv-amb">0.80</span>
         </div>
         <div class="slider-row">
           <label>色</label>
@@ -208,8 +208,8 @@
         <div class="slider-group-label">▸ 半球光 (Hemisphere)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="2" step="0.01" value="0.3" id="sl-hemi" oninput="updateLighting()">
-          <span class="slider-val" id="sv-hemi">0.30</span>
+          <input type="range" min="0" max="2" step="0.01" value="0.8" id="sl-hemi" oninput="updateLighting()">
+          <span class="slider-val" id="sv-hemi">0.80</span>
         </div>
         <div class="slider-row">
           <label>天空色</label>
@@ -334,7 +334,7 @@ composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 
 // ===== LIGHTING =====
-const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+const ambient = new THREE.AmbientLight(0xffffff, 0.8);
 scene.add(ambient);
 
 const dirLight = new THREE.DirectionalLight(0xffffff, 10);
@@ -353,7 +353,7 @@ dirLight.shadow.bias           = -0.0005;
 dirLight.shadow.normalBias     = 0.02;
 scene.add(dirLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.3);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.8);
 scene.add(hemiLight);
 
 // ===== HDR =====
@@ -846,8 +846,8 @@ window.closeLoadDialog = function() {
 // ===== LIGHTING ADJUST =====
 const LIGHT_DEFAULTS = {
   exposure:0.7, dir:10, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
-  amb:0.3, ambColor:'#ffffff',
-  hemi:0.3, hemiSky:'#ffffff', hemiGnd:'#ffffff',
+  amb:0.8, ambColor:'#ffffff',
+  hemi:0.8, hemiSky:'#ffffff', hemiGnd:'#ffffff',
   envmap:0.5, emissiveMul:1.0, bloomStr:0.05, bloomTh:0.9
 };
 let dirLightDist = 50; // モデル読み込み時に更新
