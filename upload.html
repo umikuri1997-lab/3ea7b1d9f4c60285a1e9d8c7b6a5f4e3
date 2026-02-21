@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GLB アップローダー</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230a0a0b'/><path d='M6 22 L11 10 L16 18 L19 13 L26 22Z' fill='%23c8ff00' opacity='0.9'/><circle cx='22' cy='10' r='3' fill='%23c8ff00' opacity='0.6'/></svg>">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap');
   :root {
@@ -174,6 +175,29 @@
       <label class="toggle"><input type="checkbox" id="opt-lights" checked><div class="toggle-slider"></div></label>
       <div><div class="option-label">GLB内のライトを削除</div><div class="option-desc">Point / Spot / Directional をすべて除去</div></div>
     </div>
+    <div class="option-row">
+      <label class="toggle"><input type="checkbox" id="opt-compress" checked><div class="toggle-slider"></div></label>
+      <div><div class="option-label">テクスチャを圧縮</div><div class="option-desc">画像を最大2048pxにリサイズ＆JPEG圧縮</div></div>
+    </div>
+    <div id="compress-options" style="padding:8px 0 0 46px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <label style="font-size:11px;color:var(--muted);width:80px;">最大サイズ</label>
+        <select id="opt-tex-size" style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;">
+          <option value="4096">4096px</option>
+          <option value="2048" selected>2048px</option>
+          <option value="1024">1024px</option>
+          <option value="512">512px</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:11px;color:var(--muted);width:80px;">JPEG品質</label>
+        <select id="opt-tex-quality" style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;">
+          <option value="0.9">90%（高品質）</option>
+          <option value="0.75" selected>75%（バランス）</option>
+          <option value="0.6">60%（小サイズ）</option>
+        </select>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -272,6 +296,170 @@ async function removeLights(buf){
   return{buffer:ob,count:n};
 }
 
+// TEXTURE COMPRESSION
+async function compressTextures(buf, maxSize, quality) {
+  const v = new DataView(buf);
+  if (v.getUint32(0, true) !== 0x46546C67) throw new Error('GLBファイルではありません');
+  const ver = v.getUint32(4, true);
+
+  // チャンク解析
+  let off = 12, jOff = -1, jLen = 0, bOff = -1, bLen = 0;
+  while (off < buf.byteLength) {
+    const cLen = v.getUint32(off, true), cType = v.getUint32(off + 4, true);
+    if (cType === 0x4E4F534A) { jOff = off + 8; jLen = cLen; }
+    else if (cType === 0x004E4942) { bOff = off + 8; bLen = cLen; }
+    off += 8 + cLen;
+  }
+  if (jOff < 0) throw new Error('JSONチャンクなし');
+
+  const g = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, jOff, jLen)));
+  if (!g.images || !g.images.length || bOff < 0) return { buffer: buf, saved: 0 };
+
+  const binData = new Uint8Array(buf, bOff, bLen);
+  const bvs = g.bufferViews || [];
+
+  // 各画像を圧縮して差し替えデータを作る
+  const newImageChunks = []; // {index, data: Uint8Array}
+  let totalSaved = 0;
+  let compressed = 0;
+
+  for (let i = 0; i < g.images.length; i++) {
+    const img = g.images[i];
+    if (img.bufferView === undefined) continue;
+    const bv = bvs[img.bufferView];
+    if (!bv) continue;
+
+    const imgOff = bv.byteOffset || 0;
+    const imgLen = bv.byteLength;
+    const origBytes = binData.slice(imgOff, imgOff + imgLen);
+
+    // 画像としてロード
+    const blob = new Blob([origBytes], { type: img.mimeType || 'image/png' });
+    const url = URL.createObjectURL(blob);
+
+    try {
+      const result = await new Promise((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => {
+          let w = el.width, h = el.height;
+          // リサイズが不要で既にJPEGならスキップ
+          const isJpeg = (img.mimeType === 'image/jpeg');
+          if (w <= maxSize && h <= maxSize && isJpeg) {
+            resolve(null); return;
+          }
+          // リサイズ
+          if (w > maxSize || h > maxSize) {
+            const scale = maxSize / Math.max(w, h);
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+          }
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(el, 0, 0, w, h);
+          c.toBlob(b => {
+            if (!b) { resolve(null); return; }
+            b.arrayBuffer().then(ab => resolve(new Uint8Array(ab)));
+          }, 'image/jpeg', quality);
+        };
+        el.onerror = () => reject(new Error('画像ロード失敗'));
+        el.src = url;
+      });
+      URL.revokeObjectURL(url);
+
+      if (result && result.length < imgLen) {
+        newImageChunks.push({ bvIndex: img.bufferView, data: result, origLen: imgLen });
+        totalSaved += imgLen - result.length;
+        img.mimeType = 'image/jpeg';
+        compressed++;
+      }
+    } catch (e) {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  if (!newImageChunks.length) return { buffer: buf, saved: 0, compressed: 0 };
+
+  // バイナリバッファを再構築
+  // bufferViewのoffset順にソートしてセグメントごとにコピー
+  const segments = []; // {start, end, replacement?}
+  // 全bufferViewの範囲をマーク
+  const replaceMap = new Map();
+  newImageChunks.forEach(c => replaceMap.set(c.bvIndex, c));
+
+  // バイナリを再構築：置換対象のbufferViewのデータだけ差し替え
+  // まず全bufferViewを開始位置順にリスト化
+  const bvEntries = bvs.map((bv, idx) => ({ idx, offset: bv.byteOffset || 0, length: bv.byteLength }));
+  bvEntries.sort((a, b) => a.offset - b.offset);
+
+  const newParts = [];
+  let cursor = 0;
+
+  for (const entry of bvEntries) {
+    // カーソルからこのbufferViewの開始位置までの隙間を埋める
+    if (entry.offset > cursor) {
+      newParts.push(binData.slice(cursor, entry.offset));
+    }
+
+    const replacement = replaceMap.get(entry.idx);
+    const newOffset = newParts.reduce((s, p) => s + p.length, 0);
+
+    if (replacement) {
+      // 4バイトアラインメント
+      let data = replacement.data;
+      const pad = (4 - data.length % 4) % 4;
+      if (pad > 0) {
+        const padded = new Uint8Array(data.length + pad);
+        padded.set(data);
+        data = padded;
+      }
+      newParts.push(data);
+      bvs[entry.idx].byteOffset = newOffset;
+      bvs[entry.idx].byteLength = replacement.data.length;
+    } else {
+      newParts.push(binData.slice(entry.offset, entry.offset + entry.length));
+      bvs[entry.idx].byteOffset = newOffset;
+    }
+
+    cursor = entry.offset + entry.length;
+  }
+
+  // 残りのデータ
+  if (cursor < bLen) {
+    newParts.push(binData.slice(cursor));
+  }
+
+  // 新バイナリ結合
+  const newBinLen = newParts.reduce((s, p) => s + p.length, 0);
+  const newBin = new Uint8Array(newBinLen);
+  let pos = 0;
+  for (const p of newParts) { newBin.set(p, pos); pos += p.length; }
+
+  // buffers[0]のサイズ更新
+  if (g.buffers && g.buffers[0]) g.buffers[0].byteLength = newBinLen;
+
+  // GLB再構築
+  let js = JSON.stringify(g);
+  while (js.length % 4) js += ' ';
+  const jb = new TextEncoder().encode(js);
+  const tot = 12 + 8 + jb.length + 8 + newBinLen;
+  const ob = new ArrayBuffer(tot);
+  const ov = new DataView(ob);
+  const oa = new Uint8Array(ob);
+  ov.setUint32(0, 0x46546C67, true);
+  ov.setUint32(4, ver, true);
+  ov.setUint32(8, tot, true);
+  ov.setUint32(12, jb.length, true);
+  ov.setUint32(16, 0x4E4F534A, true);
+  oa.set(jb, 20);
+  const bs = 20 + jb.length;
+  ov.setUint32(bs, newBinLen, true);
+  ov.setUint32(bs + 4, 0x004E4942, true);
+  oa.set(newBin, bs + 8);
+
+  return { buffer: ob, saved: totalSaved, compressed };
+}
+
 // QUEUE
 let queue=[];
 function addFiles(files){
@@ -319,15 +507,34 @@ async function uploadAll(){
   btn.disabled=true;btn.textContent='アップロード中...';
   document.getElementById('log-area').classList.add('visible');
   const doLights=document.getElementById('opt-lights').checked;
+  const doCompress=document.getElementById('opt-compress').checked;
+  const texMaxSize=parseInt(document.getElementById('opt-tex-size').value);
+  const texQuality=parseFloat(document.getElementById('opt-tex-quality').value);
   for(const item of queue){
     if(item.status!=='pending')continue;
-    setSt(item.id,'processing','処理中...');showPw(item.id,true);setPb(item.id,10);
+    setSt(item.id,'processing','処理中...');showPw(item.id,true);setPb(item.id,5);
     addLog(`処理中: ${item.file.name} → ${item.newName}`,'info');
+    const origSize=item.file.size;
     try{
-      let buf=await item.file.arrayBuffer();setPb(item.id,30);
+      let buf=await item.file.arrayBuffer();setPb(item.id,15);
       if(doLights){
         try{const r=await removeLights(buf);buf=r.buffer;addLog(`  ライト ${r.count} 個削除`,r.count>0?'ok':'info');}
         catch(e){addLog(`  ライト削除エラー: ${e.message}`,'err');}
+      }
+      setPb(item.id,25);
+      if(doCompress){
+        try{
+          setSt(item.id,'processing','圧縮中...');
+          const r=await compressTextures(buf,texMaxSize,texQuality);
+          buf=r.buffer;
+          if(r.compressed>0){
+            const savedMB=(r.saved/1024/1024).toFixed(1);
+            const newMB=(buf.byteLength/1024/1024).toFixed(1);
+            addLog(`  テクスチャ ${r.compressed} 枚圧縮 (-${savedMB}MB → ${newMB}MB)`,'ok');
+          } else {
+            addLog('  圧縮対象のテクスチャなし','info');
+          }
+        }catch(e){addLog(`  テクスチャ圧縮エラー: ${e.message}`,'err');}
       }
       setPb(item.id,60);
       const res=await fetch(`${sbUrl}/storage/v1/object/${sbBucket}/${encodeURIComponent(item.newName)}`,{

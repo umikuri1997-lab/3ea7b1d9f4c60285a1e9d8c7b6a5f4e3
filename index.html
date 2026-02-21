@@ -512,6 +512,11 @@ function loadGLB(url, displayUrl) {
       if (obj.isMesh) {
         obj.castShadow = true;
         obj.receiveShadow = true;
+        // "Tree"を含むメッシュは両面描画
+        if (obj.name && /Tree/i.test(obj.name)) {
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          mats.forEach(mat => { mat.side = THREE.DoubleSide; });
+        }
         // マテリアルの環境反射を強化
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         mats.forEach(mat => {
@@ -602,9 +607,11 @@ window.switchCamera = function(idx) {
   activeCamIdx = -1; // 常にウォークモード
   activeCamera = walkCamera;
 
+  let camName = '';
   if (idx >= 0 && glbCameras[idx]) {
     // GLBカメラの位置と向きをwalkCameraにコピー
     const cam = glbCameras[idx];
+    camName = cam.name || '';
     cam.updateMatrixWorld(true);
     walkCamera.position.setFromMatrixPosition(cam.matrixWorld);
     // 向きからyaw/pitchを抽出
@@ -612,6 +619,20 @@ window.switchCamera = function(idx) {
     yaw = Math.atan2(-dir.x, -dir.z);
     pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
   }
+
+  // 外観・外部カメラは反射を抑える
+  const isExterior = /外観|外部/.test(camName);
+  const envVal = isExterior ? 0.5 : LIGHT_DEFAULTS.envmap;
+  document.getElementById('sl-envmap').value = envVal;
+  if (loadedModel) {
+    loadedModel.traverse(obj => {
+      if (obj.isMesh) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach(m => { if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) m.envMapIntensity = envVal; });
+      }
+    });
+  }
+  document.getElementById('sv-envmap').textContent = envVal.toFixed(1);
 
   document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
   document.querySelectorAll('.cam-item').forEach(el => el.classList.toggle('active', parseInt(el.dataset.idx) === idx));
