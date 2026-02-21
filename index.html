@@ -634,7 +634,8 @@ function loadGLB(url, displayUrl) {
     overlay.style.display = 'none';
     loadBar.style.display = 'none';
     document.getElementById('btn-reload').style.display = '';
-    document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
+    updateEmissiveSpotCulling(walkCamera);
+ document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
     const parts = (displayUrl || url).split('/');
     { const __el = document.getElementById('model-name'); if(__el) __el.textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb'); }
     activeCamera = walkCamera;
@@ -968,16 +969,18 @@ const SPOT_CULL_INTERVAL = 3; // 毎フレームではなく数フレームに1�
 let _spotCullTick = 0;
 const _tmpCamPos = new THREE.Vector3();
 function updateEmissiveSpotCulling(cam) {
-  if (!window._emissiveLights || window._emissiveLights.length === 0) return;
-  if ((_spotCullTick++ % SPOT_CULL_INTERVAL) !== 0) return;
-  _tmpCamPos.copy(cam.position);
-  // まず影を全OFF → 近い6個だけON
-  for (const l of window._emissiveLights) l.castShadow = false;
+  const arr = window._emissiveLights;
+  if (!arr || arr.length === 0) return;
+  const camPos = cam.position;
+  // shadows off first
+  for (let i = 0; i < arr.length; i++) arr[i].castShadow = false;
+  // nearest 6
   const bestD2 = [Infinity, Infinity, Infinity, Infinity, Infinity, Infinity];
   const bestL  = [null, null, null, null, null, null];
   const mul = (window._currentEmMul != null) ? window._currentEmMul : 1.0;
-  for (const l of window._emissiveLights) {
-    const d2 = _tmpCamPos.distanceToSquared(l.position);
+  for (let i = 0; i < arr.length; i++) {
+    const l = arr[i];
+    const d2 = camPos.distanceToSquared(l.position);
     const active = d2 <= SPOT_CULL_RADIUS2;
     l.visible = active;
     if (!active) { l.intensity = 0; continue; }
@@ -990,16 +993,16 @@ function updateEmissiveSpotCulling(cam) {
       }
     }
   }
-  for (const l of bestL) { if (l) l.castShadow = true; }
+  for (let i = 0; i < 6; i++) if (bestL[i]) bestL[i].castShadow = true;
 }
+
 
 // ===== RENDER LOOP =====
 let lastTime = 0, frameCount = 0;
 function animate(time) {
   requestAnimationFrame(animate);
   updateWalk();
- updateEmissiveSpotCulling(activeCamera);
-  renderPass.camera = activeCamera;
+renderPass.camera = activeCamera;
   composer.render();
   frameCount++;
   if (time - lastTime > 1000) {
