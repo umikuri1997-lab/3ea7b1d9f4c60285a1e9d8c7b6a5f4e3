@@ -196,8 +196,8 @@
         <div class="slider-group-label">▸ 環境光 (Ambient)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="2" step="0.01" value="0.8" id="sl-amb" oninput="updateLighting()">
-          <span class="slider-val" id="sv-amb">0.80</span>
+          <input type="range" min="0" max="5" step="0.01" value="3" id="sl-amb" oninput="updateLighting()">
+          <span class="slider-val" id="sv-amb">3.00</span>
         </div>
         <div class="slider-row">
           <label>色</label>
@@ -334,7 +334,7 @@ composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 
 // ===== LIGHTING =====
-const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+const ambient = new THREE.AmbientLight(0xffffff, 3);
 scene.add(ambient);
 
 const dirLight = new THREE.DirectionalLight(0xffffff, 10);
@@ -561,8 +561,8 @@ function loadGLB(url, displayUrl) {
           const radius = Math.max(sz.x, sz.y, sz.z) * 3;
           emissiveCandidates.push({
             pos, color: mat.emissive.clone(),
-            intensity: Math.min(intensity * 0.02, 5),
-            distance: Math.max(radius, 3),
+            intensity: Math.min(intensity * 0.05, 15),
+            distance: Math.max(radius, 5),
             name: obj.name || ''
           });
           break;
@@ -578,8 +578,8 @@ function loadGLB(url, displayUrl) {
       sl.position.copy(c.pos);
       // 影は動的に最寄り6個だけ有効化
       sl.castShadow = false;
-      sl.shadow.mapSize.width = 512;
-      sl.shadow.mapSize.height = 512;
+      sl.shadow.mapSize.width = 1024;
+      sl.shadow.mapSize.height = 1024;
       sl.shadow.bias = -0.002;
       sl.userData.baseIntensity = c.intensity;
       // ターゲットを真下に
@@ -682,6 +682,13 @@ window.switchCamera = function(idx) {
     yaw = Math.atan2(-dir.x, -dir.z);
     pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
   }
+
+  // 外観・外部カメラはディレクショナルライトを抑える
+  const isExterior = /外観|外部/.test(camName);
+  const dirVal = isExterior ? 3 : LIGHT_DEFAULTS.dir;
+  dirLight.intensity = dirVal;
+  document.getElementById('sl-dir').value = dirVal;
+  document.getElementById('sv-dir').textContent = dirVal.toFixed(1);
 
   // カメラ位置に最も近いSpotLight 6個の影を有効化
   if (window._emissiveLights && window._emissiveLights.length > 0) {
@@ -826,7 +833,7 @@ window.closeLoadDialog = function() {
 // ===== LIGHTING ADJUST =====
 const LIGHT_DEFAULTS = {
   exposure:1.0, dir:10, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
-  amb:0.8, ambColor:'#ffffff',
+  amb:3, ambColor:'#ffffff',
   hemi:0, hemiSky:'#ffffff', hemiGnd:'#ffffff',
   envmap:0.5, emissiveMul:5.0, bloomStr:0.03, bloomTh:0.9
 };
