@@ -531,9 +531,9 @@ function loadGLB(url, displayUrl) {
       if (obj.isMesh) {
         obj.castShadow = true;
         obj.receiveShadow = true;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
 
         // ガラス・透明素材は影を落とさない（光を貫通させる）
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         const isGlass = /ガラス|glass|窓|window/i.test(obj.name) ||
           mats.some(m => /ガラス|glass|窓|window/i.test(m.name || '')) ||
           mats.some(m => m.transparent && m.opacity < 0.9);
@@ -543,11 +543,10 @@ function loadGLB(url, displayUrl) {
 
         // "Tree"を含むメッシュは両面描画
         if (obj.name && /Tree/i.test(obj.name)) {
-          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
           mats.forEach(mat => { mat.side = THREE.DoubleSide; });
         }
+
         // マテリアルの環境反射を強化
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         mats.forEach(mat => {
           if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
             mat.envMapIntensity = 1.5;
