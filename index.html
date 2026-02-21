@@ -531,6 +531,16 @@ function loadGLB(url, displayUrl) {
       if (obj.isMesh) {
         obj.castShadow = true;
         obj.receiveShadow = true;
+
+        // ガラス・透明素材は影を落とさない（光を貫通させる）
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        const isGlass = /ガラス|glass|窓|window/i.test(obj.name) ||
+          mats.some(m => /ガラス|glass|窓|window/i.test(m.name || '')) ||
+          mats.some(m => m.transparent && m.opacity < 0.9);
+        if (isGlass) {
+          obj.castShadow = false;
+        }
+
         // "Tree"を含むメッシュは両面描画
         if (obj.name && /Tree/i.test(obj.name)) {
           const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
