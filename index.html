@@ -513,8 +513,8 @@ function loadGLB(url, displayUrl) {
     loadedModel = gltf.scene;
     gltf.scene.traverse(obj => {
       if (obj.isMesh) {
-        obj.castShadow = true;
-        obj.receiveShadow = true;
+        obj.castShadow = !isMobile;
+        obj.receiveShadow = !isMobile;
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
 
         // 透明素材（opacity < 0.5）は影を落とさない（光を100%貫通）
@@ -538,14 +538,13 @@ function loadGLB(url, displayUrl) {
     });
     scene.add(gltf.scene);
 
-    // Emissive → SpotLight 自動生成（下向き照射）※モバイルではスキップ
+    // Emissive → SpotLight 自動生成（下向き照射）
     // 前回のemissiveライトをクリア
     if (window._emissiveLights) {
       window._emissiveLights.forEach(l => { scene.remove(l); if(l.target) scene.remove(l.target); });
     }
     window._emissiveLights = [];
 
-    if (!isMobile) {
     const emissiveThreshold = 100;
     const maxEmissiveLights = 32;
     const emissiveCandidates = [];
@@ -576,7 +575,7 @@ function loadGLB(url, displayUrl) {
     emissiveCandidates.sort((a, b) => b.intensity - a.intensity);
     const toPlace = emissiveCandidates.slice(0, maxEmissiveLights);
     toPlace.forEach((c, i) => {
-      const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(60), 0.5);
+      const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(80), 0.5);
       sl.position.copy(c.pos);
       // 影は動的に最寄り6個だけ有効化
       sl.castShadow = false;
@@ -594,7 +593,6 @@ function loadGLB(url, displayUrl) {
     if (toPlace.length > 0) {
       console.log(`EmissiveSpotLight: ${toPlace.length}個配置（影付き${Math.min(toPlace.length,6)}個 / 候補${emissiveCandidates.length}個）`);
     }
-    } // end if (!isMobile)
 
     // Cameras
     glbCameras = [];
@@ -619,13 +617,13 @@ function loadGLB(url, displayUrl) {
     dirLightDist = maxDim * 2;
     updateLighting(); // スライダー値で位置を設定
 
-    // モバイル: すべてのライトをOFF（パフォーマンス優先）
+    // モバイル: 影をすべてOFF（パフォーマンス優先）
     if (isMobile) {
-      dirLight.intensity = 0;
       dirLight.castShadow = false;
-      ambient.intensity = 0;
-      hemiLight.intensity = 0;
       renderer.shadowMap.enabled = false;
+      if (window._emissiveLights) {
+        window._emissiveLights.forEach(l => { l.castShadow = false; });
+      }
     }
 
     // Walk camera position
@@ -703,8 +701,8 @@ window.switchCamera = function(idx) {
   document.getElementById('sl-dir').value = dirVal;
   document.getElementById('sv-dir').textContent = dirVal.toFixed(1);
 
-  // カメラ位置に最も近いSpotLight 6個の影を有効化
-  if (window._emissiveLights && window._emissiveLights.length > 0) {
+  // カメラ位置に最も近いSpotLight 6個の影を有効化（モバイルでは影なし）
+  if (!isMobile && window._emissiveLights && window._emissiveLights.length > 0) {
     const camPos = walkCamera.position;
     const sorted = window._emissiveLights
       .map(l => ({ light: l, dist: camPos.distanceTo(l.position) }))
