@@ -229,14 +229,9 @@
           <span class="slider-val" id="sv-envmap">1.5</span>
         </div>
         <div class="slider-row">
-          <label>SSAO 半径</label>
-          <input type="range" min="0.05" max="2" step="0.05" value="0.5" id="sl-ssao-rad" oninput="updateLighting()">
-          <span class="slider-val" id="sv-ssao-rad">0.50</span>
-        </div>
-        <div class="slider-row">
-          <label>SSAO 範囲</label>
-          <input type="range" min="0.01" max="0.5" step="0.01" value="0.15" id="sl-ssao-dist" oninput="updateLighting()">
-          <span class="slider-val" id="sv-ssao-dist">0.15</span>
+          <label>放射光 強度</label>
+          <input type="range" min="0" max="10" step="0.1" value="1.0" id="sl-emissive-mul" oninput="updateLighting()">
+          <span class="slider-val" id="sv-emissive-mul">1.0</span>
         </div>
         <div class="slider-row">
           <label>Bloom 強度</label>
@@ -301,14 +296,13 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ===== RENDERER =====
 const container = document.getElementById('canvas-container');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -316,6 +310,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 container.appendChild(renderer.domElement);
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 // ===== SCENE =====
 const scene = new THREE.Scene();
@@ -327,27 +322,16 @@ let activeCamera = walkCamera;
 let glbCameras = [];
 let activeCamIdx = -1;
 
-// ===== POST-PROCESSING =====
+// ===== POST-PROCESSING (Bloom) =====
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, walkCamera);
 composer.addPass(renderPass);
-
-// SSAO – 室内の角や接地面に自然な陰影
-const ssaoPass = new SSAOPass(scene, walkCamera, window.innerWidth, window.innerHeight);
-ssaoPass.kernelRadius = 0.5;
-ssaoPass.minDistance = 0.001;
-ssaoPass.maxDistance = 0.15;
-composer.addPass(ssaoPass);
-
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.06,   // strength – ごく控えめなグロー
-  0.4,    // radius
-  0.9     // threshold – より明るい部分だけ光る
+  0.06, 0.4, 0.9
 );
 composer.addPass(bloomPass);
-const outputPass = new OutputPass();
-composer.addPass(outputPass);
+composer.addPass(new OutputPass());
 
 // ===== LIGHTING =====
 const ambient = new THREE.AmbientLight(0xffffff, 0.8);
@@ -357,8 +341,8 @@ const dirLight = new THREE.DirectionalLight(0xffffff, 3.0);
 dirLight.position.set(15, 30, 15);
 dirLight.castShadow = true;
 // 高品質影の設定
-dirLight.shadow.mapSize.width  = 4096;
-dirLight.shadow.mapSize.height = 4096;
+dirLight.shadow.mapSize.width  = 2048;
+dirLight.shadow.mapSize.height = 2048;
 dirLight.shadow.camera.near    = 0.1;
 dirLight.shadow.camera.far     = 300;
 dirLight.shadow.camera.left    = -60;
@@ -534,7 +518,7 @@ function loadGLB(url, displayUrl) {
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
 
         // 透明素材（opacity < 0.5）は影を落とさない（光を100%貫通）
-        if (mats.some(m => m.transparent && m.opacity < 0.5)) {
+        if (mats.some(m => m.transparent && m.opacity <= 0.9)) {
           obj.castShadow = false;
         }
 
@@ -553,6 +537,54 @@ function loadGLB(url, displayUrl) {
       }
     });
     scene.add(gltf.scene);
+
+    // Emissive → PointLight 自動生成
+    // 前回のemissiveライトをクリア
+    if (window._emissiveLights) {
+      window._emissiveLights.forEach(l => scene.remove(l));
+    }
+    window._emissiveLights = [];
+    const emissiveThreshold = 100;
+    const maxEmissiveLights = 32;
+    const emissiveCandidates = [];
+
+    gltf.scene.traverse(obj => {
+      if (!obj.isMesh) return;
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      for (const mat of mats) {
+        const intensity = mat.emissiveIntensity || 0;
+        if (intensity >= emissiveThreshold && mat.emissive) {
+          const pos = new THREE.Vector3();
+          obj.getWorldPosition(pos);
+          // メッシュのバウンディングボックスからサイズを推定
+          const bb = new THREE.Box3().setFromObject(obj);
+          const sz = bb.getSize(new THREE.Vector3());
+          const radius = Math.max(sz.x, sz.y, sz.z) * 3;
+          emissiveCandidates.push({
+            pos, color: mat.emissive.clone(),
+            intensity: Math.min(intensity * 0.02, 5),
+            distance: Math.max(radius, 3),
+            name: obj.name || ''
+          });
+          break;
+        }
+      }
+    });
+
+    // 強い順にソートして上限まで配置
+    emissiveCandidates.sort((a, b) => b.intensity - a.intensity);
+    const toPlace = emissiveCandidates.slice(0, maxEmissiveLights);
+    toPlace.forEach(c => {
+      const pl = new THREE.PointLight(c.color, c.intensity, c.distance);
+      pl.position.copy(c.pos);
+      pl.castShadow = false;
+      pl.userData.baseIntensity = c.intensity;
+      scene.add(pl);
+      window._emissiveLights.push(pl);
+    });
+    if (toPlace.length > 0) {
+      console.log(`EmissiveLight: ${toPlace.length}個配置（候補${emissiveCandidates.length}個）`);
+    }
 
     // Cameras
     glbCameras = [];
@@ -691,7 +723,6 @@ let touchLookId = null, touchMoveId = null;
 let touchLookStart = {x:0, y:0};
 let touchMoveStart = {x:0, y:0};
 let touchMoveVec = {x:0, z:0};
-const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 renderer.domElement.addEventListener('touchstart', e => {
   if (activeCamIdx !== -1 || !loadedModel) return;
@@ -794,8 +825,7 @@ const LIGHT_DEFAULTS = {
   exposure:1.0, dir:3.0, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
   amb:0.8, ambColor:'#ffffff',
   hemi:0, hemiSky:'#ffffff', hemiGnd:'#ffffff',
-  envmap:1.5, ssaoRad:0.5, ssaoDist:0.15,
-  bloomStr:0.06, bloomTh:0.9
+  envmap:1.5, emissiveMul:1.0, bloomStr:0.06, bloomTh:0.9
 };
 let dirLightDist = 50; // モデル読み込み時に更新
 let dirLightCenter = new THREE.Vector3();
@@ -816,8 +846,7 @@ window.updateLighting = function() {
   const hemiSky = c('sl-hemi-sky');
   const hemiGnd = c('sl-hemi-gnd');
   const env = v('sl-envmap');
-  const ssaoRad = v('sl-ssao-rad');
-  const ssaoDist = v('sl-ssao-dist');
+  const emMul = v('sl-emissive-mul');
   const bStr = v('sl-bloom-str');
   const bTh = v('sl-bloom-th');
 
@@ -847,8 +876,10 @@ window.updateLighting = function() {
   bloomPass.strength = bStr;
   bloomPass.threshold = bTh;
 
-  ssaoPass.kernelRadius = ssaoRad;
-  ssaoPass.maxDistance = ssaoDist;
+  // Emissiveライト強度を一括調整
+  if (window._emissiveLights) {
+    window._emissiveLights.forEach(l => { l.intensity = l.userData.baseIntensity * emMul; });
+  }
 
   if (loadedModel) {
     loadedModel.traverse(obj => {
@@ -871,8 +902,7 @@ window.updateLighting = function() {
   document.getElementById('sv-hemi-sky').textContent = hemiSky.substring(0,7);
   document.getElementById('sv-hemi-gnd').textContent = hemiGnd.substring(0,7);
   document.getElementById('sv-envmap').textContent = env.toFixed(1);
-  document.getElementById('sv-ssao-rad').textContent = ssaoRad.toFixed(2);
-  document.getElementById('sv-ssao-dist').textContent = ssaoDist.toFixed(2);
+  document.getElementById('sv-emissive-mul').textContent = emMul.toFixed(1);
   document.getElementById('sv-bloom-str').textContent = bStr.toFixed(2);
   document.getElementById('sv-bloom-th').textContent = bTh.toFixed(2);
 };
@@ -891,8 +921,7 @@ window.resetLighting = function() {
   document.getElementById('sl-hemi-sky').value = d.hemiSky;
   document.getElementById('sl-hemi-gnd').value = d.hemiGnd;
   document.getElementById('sl-envmap').value = d.envmap;
-  document.getElementById('sl-ssao-rad').value = d.ssaoRad;
-  document.getElementById('sl-ssao-dist').value = d.ssaoDist;
+  document.getElementById('sl-emissive-mul').value = d.emissiveMul;
   document.getElementById('sl-bloom-str').value = d.bloomStr;
   document.getElementById('sl-bloom-th').value = d.bloomTh;
   updateLighting();
@@ -906,7 +935,6 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
   bloomPass.resolution.set(window.innerWidth, window.innerHeight);
-  ssaoPass.setSize(window.innerWidth, window.innerHeight);
 });
 
 // ===== RENDER LOOP =====
@@ -915,7 +943,6 @@ function animate(time) {
   requestAnimationFrame(animate);
   updateWalk();
   renderPass.camera = activeCamera;
-  ssaoPass.camera = activeCamera;
   composer.render();
   frameCount++;
   if (time - lastTime > 1000) {

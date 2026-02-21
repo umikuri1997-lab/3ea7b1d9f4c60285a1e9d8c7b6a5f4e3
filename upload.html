@@ -173,7 +173,7 @@
     </div>
     <div class="option-row">
       <label class="toggle"><input type="checkbox" id="opt-lights" checked><div class="toggle-slider"></div></label>
-      <div><div class="option-label">GLB内のライトを整理</div><div class="option-desc">Spotライトのみ残し、他を削除</div></div>
+      <div><div class="option-label">GLB内のライトを削除</div><div class="option-desc">すべてのライトを除去（ビューアー側で再生成）</div></div>
     </div>
     <div class="option-row">
       <label class="toggle"><input type="checkbox" id="opt-compress" checked><div class="toggle-slider"></div></label>
@@ -286,49 +286,10 @@ async function removeLights(buf){
   while(off<buf.byteLength){const cLen=v.getUint32(off,true),cType=v.getUint32(off+4,true);if(cType===0x4E4F534A){jOff=off+8;jLen=cLen;}else if(cType===0x004E4942){bOff=off;bLen=cLen;}off+=8+cLen;}
   if(jOff<0)throw new Error('JSONチャンクなし');
   const g=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,jOff,jLen)));
-  let removed=0, kept=0;
-
-  const lights = g.extensions?.KHR_lights_punctual?.lights || [];
-  if(lights.length > 0){
-    // Spotを含むライトだけ残す（名前 or type で判定）
-    const indexMap = new Array(lights.length).fill(-1);
-    const newLights = [];
-    lights.forEach((light, i) => {
-      const isSpot = /spot/i.test(light.name || '');
-      if(isSpot){
-        indexMap[i] = newLights.length;
-        newLights.push(light);
-        kept++;
-      } else {
-        removed++;
-      }
-    });
-
-    // ノードのライト参照を更新/削除
-    (g.nodes||[]).forEach(nd => {
-      if(nd.extensions?.KHR_lights_punctual){
-        const oldIdx = nd.extensions.KHR_lights_punctual.light;
-        const newIdx = (oldIdx !== undefined && oldIdx < indexMap.length) ? indexMap[oldIdx] : -1;
-        if(newIdx >= 0){
-          nd.extensions.KHR_lights_punctual.light = newIdx;
-        } else {
-          delete nd.extensions.KHR_lights_punctual;
-          if(nd.extensions && !Object.keys(nd.extensions).length) delete nd.extensions;
-        }
-      }
-    });
-
-    if(newLights.length > 0){
-      g.extensions.KHR_lights_punctual.lights = newLights;
-    } else {
-      delete g.extensions.KHR_lights_punctual;
-      if(g.extensions && !Object.keys(g.extensions).length) delete g.extensions;
-      ['extensionsUsed','extensionsRequired'].forEach(k=>{
-        if(g[k]){g[k]=g[k].filter(e=>e!=='KHR_lights_punctual');if(!g[k].length)delete g[k];}
-      });
-    }
-  }
-
+  let n=0;
+  if(g.extensions?.KHR_lights_punctual){n+=(g.extensions.KHR_lights_punctual.lights||[]).length;delete g.extensions.KHR_lights_punctual;if(!Object.keys(g.extensions).length)delete g.extensions;}
+  ['extensionsUsed','extensionsRequired'].forEach(k=>{if(g[k]){g[k]=g[k].filter(e=>e!=='KHR_lights_punctual');if(!g[k].length)delete g[k];}});
+  (g.nodes||[]).forEach(nd=>{if(nd.extensions?.KHR_lights_punctual){delete nd.extensions.KHR_lights_punctual;if(!Object.keys(nd.extensions).length)delete nd.extensions;}});
   let js=JSON.stringify(g);while(js.length%4)js+=' ';
   const jb=new TextEncoder().encode(js);
   const tot=12+8+jb.length+(bOff>=0?8+bLen:0);
@@ -336,7 +297,7 @@ async function removeLights(buf){
   ov.setUint32(0,0x46546C67,true);ov.setUint32(4,ver,true);ov.setUint32(8,tot,true);
   ov.setUint32(12,jb.length,true);ov.setUint32(16,0x4E4F534A,true);oa.set(jb,20);
   if(bOff>=0){const bs=20+jb.length;ov.setUint32(bs,bLen,true);ov.setUint32(bs+4,0x004E4942,true);oa.set(new Uint8Array(buf,bOff+8,bLen),bs+8);}
-  return{buffer:ob, removed, kept};
+  return{buffer:ob, count:n};
 }
 
 // TEXTURE COMPRESSION
@@ -578,7 +539,7 @@ async function uploadAll(){
     try{
       let buf=await item.file.arrayBuffer();setPb(item.id,15);
       if(doLights){
-        try{const r=await removeLights(buf);buf=r.buffer;addLog(`  ライト ${r.removed} 個削除 / Spot ${r.kept} 個保持`,r.removed>0?'ok':'info');}
+        try{const r=await removeLights(buf);buf=r.buffer;addLog(`  ライト ${r.count} 個削除`,r.count>0?'ok':'info');}
         catch(e){addLog(`  ライト削除エラー: ${e.message}`,'err');}
       }
       setPb(item.id,25);
