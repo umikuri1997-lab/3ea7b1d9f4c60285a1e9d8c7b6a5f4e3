@@ -230,8 +230,8 @@
         </div>
         <div class="slider-row">
           <label>放射光 強度</label>
-          <input type="range" min="0" max="10" step="0.1" value="1.0" id="sl-emissive-mul" oninput="updateLighting()">
-          <span class="slider-val" id="sv-emissive-mul">1.0</span>
+          <input type="range" min="0" max="10" step="0.1" value="0.5" id="sl-emissive-mul" oninput="updateLighting()">
+          <span class="slider-val" id="sv-emissive-mul">0.5</span>
         </div>
         <div class="slider-row">
           <label>Bloom 強度</label>
@@ -846,7 +846,7 @@ const LIGHT_DEFAULTS = {
   exposure:0.7, dir:10, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
   amb:0.8, ambColor:'#ffffff',
   hemi:0.8, hemiSky:'#ffffff', hemiGnd:'#ffffff',
-  envmap:0.5, emissiveMul:1.0, bloomStr:0.05, bloomTh:0.9
+  envmap:0.5, emissiveMul:0.5, bloomStr:0.05, bloomTh:0.9
 };
 let dirLightDist = 50; // モデル読み込み時に更新
 let dirLightCenter = new THREE.Vector3();
