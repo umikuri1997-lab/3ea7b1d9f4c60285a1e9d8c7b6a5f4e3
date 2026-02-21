@@ -533,11 +533,8 @@ function loadGLB(url, displayUrl) {
         obj.receiveShadow = true;
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
 
-        // ガラス・透明素材は影を落とさない（光を貫通させる）
-        const isGlass = /ガラス|glass|窓|window/i.test(obj.name) ||
-          mats.some(m => /ガラス|glass|窓|window/i.test(m.name || '')) ||
-          mats.some(m => m.transparent && m.opacity < 0.9);
-        if (isGlass) {
+        // 透明素材（opacity < 0.5）は影を落とさない（光を100%貫通）
+        if (mats.some(m => m.transparent && m.opacity < 0.5)) {
           obj.castShadow = false;
         }
 
