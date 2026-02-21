@@ -196,8 +196,8 @@
         <div class="slider-group-label">▸ 環境光 (Ambient)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="5" step="0.01" value="3" id="sl-amb" oninput="updateLighting()">
-          <span class="slider-val" id="sv-amb">3.00</span>
+          <input type="range" min="0" max="5" step="0.01" value="1" id="sl-amb" oninput="updateLighting()">
+          <span class="slider-val" id="sv-amb">1.00</span>
         </div>
         <div class="slider-row">
           <label>色</label>
@@ -208,8 +208,8 @@
         <div class="slider-group-label">▸ 半球光 (Hemisphere)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="2" step="0.01" value="0" id="sl-hemi" oninput="updateLighting()">
-          <span class="slider-val" id="sv-hemi">0.00</span>
+          <input type="range" min="0" max="2" step="0.01" value="1" id="sl-hemi" oninput="updateLighting()">
+          <span class="slider-val" id="sv-hemi">1.00</span>
         </div>
         <div class="slider-row">
           <label>天空色</label>
@@ -230,8 +230,8 @@
         </div>
         <div class="slider-row">
           <label>放射光 強度</label>
-          <input type="range" min="0" max="10" step="0.1" value="5.0" id="sl-emissive-mul" oninput="updateLighting()">
-          <span class="slider-val" id="sv-emissive-mul">5.0</span>
+          <input type="range" min="0" max="10" step="0.1" value="1.0" id="sl-emissive-mul" oninput="updateLighting()">
+          <span class="slider-val" id="sv-emissive-mul">1.0</span>
         </div>
         <div class="slider-row">
           <label>Bloom 強度</label>
@@ -334,7 +334,7 @@ composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 
 // ===== LIGHTING =====
-const ambient = new THREE.AmbientLight(0xffffff, 3);
+const ambient = new THREE.AmbientLight(0xffffff, 1);
 scene.add(ambient);
 
 const dirLight = new THREE.DirectionalLight(0xffffff, 10);
@@ -353,7 +353,7 @@ dirLight.shadow.bias           = -0.0005;
 dirLight.shadow.normalBias     = 0.02;
 scene.add(dirLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 1);
 scene.add(hemiLight);
 
 // ===== HDR =====
@@ -574,7 +574,7 @@ function loadGLB(url, displayUrl) {
     emissiveCandidates.sort((a, b) => b.intensity - a.intensity);
     const toPlace = emissiveCandidates.slice(0, maxEmissiveLights);
     toPlace.forEach((c, i) => {
-      const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, Math.PI * 2 / 3, 0.5);
+      const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(80), 0.5);
       sl.position.copy(c.pos);
       // 影は動的に最寄り6個だけ有効化
       sl.castShadow = false;
@@ -833,9 +833,9 @@ window.closeLoadDialog = function() {
 // ===== LIGHTING ADJUST =====
 const LIGHT_DEFAULTS = {
   exposure:1.0, dir:10, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
-  amb:3, ambColor:'#ffffff',
-  hemi:0, hemiSky:'#ffffff', hemiGnd:'#ffffff',
-  envmap:0.5, emissiveMul:5.0, bloomStr:0.03, bloomTh:0.9
+  amb:1, ambColor:'#ffffff',
+  hemi:1, hemiSky:'#ffffff', hemiGnd:'#ffffff',
+  envmap:0.5, emissiveMul:1.0, bloomStr:0.03, bloomTh:0.9
 };
 let dirLightDist = 50; // モデル読み込み時に更新
 let dirLightCenter = new THREE.Vector3();
