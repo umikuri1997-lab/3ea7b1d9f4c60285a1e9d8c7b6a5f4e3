@@ -215,8 +215,8 @@
 <span class="slider-val" id="sv-hemi-gnd">#ffffff</span>
 </div>
 <div class="slider-group-label">▸ マテリアル / ポスプロ</div>
-
-<div class="slider-row"><label>スポット ぼかし</label><input id="sl-spot-pen" max="1" min="0" oninput="updateLighting()" step="0.01" type="range" value="0.50"/><span class="slider-val" id="sv-spot-pen">0.50</span></div><div class="slider-row">
+<div class="slider-row"><label>ポイント 影ぼかし</label><input id="sl-pt-soft" max="10" min="0" oninput="updateLighting()" step="1" type="range" value="3"/><span class="slider-val" id="sv-pt-soft">3</span></div>
+<div class="slider-row">
 <label>放射光 強度</label>
 <input id="sl-emissive-mul" max="10" min="0" oninput="updateLighting()" step="0.1" type="range" value="2.0"/>
           \12.0\3
@@ -564,19 +564,16 @@ function loadGLB(url, displayUrl) {
     emissiveCandidates.sort((a, b) => b.intensity - a.intensity);
     const toPlace = emissiveCandidates.slice(0, maxEmissiveLights);
     toPlace.forEach((c, i) => {
-      const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(80), 0.5);
-      sl.position.copy(c.pos);
+      const pl = new THREE.PointLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(80), 0.5);
+      pl.position.copy(c.pos);
       // 影は動的に最寄り6個だけ有効化
-      sl.castShadow = false;
-      sl.shadow.mapSize.width = 1024;
-      sl.shadow.mapSize.height = 1024;
-      sl.shadow.bias = -0.002;
-      sl.userData.baseIntensity = c.intensity;
-      // ターゲットを真下に
-      sl.target.position.set(c.pos.x, c.pos.y - 1, c.pos.z);
-      scene.add(sl);
-      scene.add(sl.target);
-      window._emissiveLights.push(sl);
+      pl.castShadow = false;
+      pl.shadow.mapSize.width = 1024;
+      pl.shadow.mapSize.height = 1024;
+      pl.shadow.bias = -0.002;
+ pl.shadow.radius = Math.max(0, Math.round(window._ptSoft ?? 3));
+      pl.userData.baseIntensity = c.intensity;
+window._emissiveLights.push(pl);
     });
     if (toPlace.length > 0) {
       console.log(`EmissiveSpotLight: ${toPlace.length}個配置（影付き${Math.min(toPlace.length,6)}個 / 候補${emissiveCandidates.length}個）`);
@@ -639,7 +636,8 @@ function buildCameraList() {
   list.innerHTML = '';
   const walkItem = document.createElement('div');
   walkItem.className = 'cam-item active'; walkItem.dataset.idx = '-1';
-  walkItem.innerHTML = `<div class="cam-icon">🚶</div><div class="cam-label">ウォークスルー</div>`;
+  walkItem.innerHTML = `<div class="cam-icon">🚶</div>
+<div class="cam-label">ウォークスルー</div>`;
   walkItem.onclick = () => switchCamera(-1);
   list.appendChild(walkItem);
   if (!glbCameras.length) {
@@ -650,7 +648,8 @@ function buildCameraList() {
     glbCameras.forEach((cam, i) => {
       const item = document.createElement('div');
       item.className = 'cam-item'; item.dataset.idx = i;
-      item.innerHTML = `<div class="cam-icon">📷</div><div class="cam-label">${cam.name || 'Camera ' + (i+1)}</div>`;
+      item.innerHTML = `<div class="cam-icon">📷</div>
+<div class="cam-label">${cam.name || 'Camera ' + (i+1)}</div>`;
       item.onclick = () => switchCamera(i); list.appendChild(item);
     });
   }
@@ -825,8 +824,8 @@ const LIGHT_DEFAULTS = {
   exposure:0.8, dir:5, dirColor:'#ffffff', dirAzimuth:45, dirElevation:45, dirShadow:true,
   amb:2, ambColor:'#ffffff',
   hemi:2, hemiSky:'#ffffff', hemiGnd:'#ffffff',
- 
- spotPen:0.5, emissiveMul:2.0, bloomStr:0.03, bloomTh:0.9
+ emissiveMul:2.0, 
+ ptSoft:3, bloomStr:0.03, bloomTh:0.9
 };
 window._currentEmMul = LIGHT_DEFAULTS.emissiveMul;
 
@@ -850,8 +849,8 @@ window.updateLighting = function() {
   const hemiGnd = c('sl-hemi-gnd');
 const emMul = v('sl-emissive-mul');
  
- const spotPen = v('sl-spot-pen');
- window._spotPen = spotPen;
+ const ptSoft = v('sl-pt-soft');
+ window._ptSoft = ptSoft;
 window._currentEmMul = emMul;
   const bStr = v('sl-bloom-str');
   const bTh = v('sl-bloom-th');
@@ -886,7 +885,7 @@ window._currentEmMul = emMul;
   // Emissiveライト強度を一括調整
   if (window._emissiveLights) {
     window._emissiveLights.forEach(l => { l.intensity = l.userData.baseIntensity * emMul; });
- window._emissiveLights.forEach(l => { l.penumbra = (window._spotPen ?? 0.5); l.shadow.radius = Math.max(1, Math.round((window._spotPen ?? 0.5) * 4)); });
+ window._emissiveLights.forEach(l => { l.shadow.radius = Math.max(0, Math.round((window._ptSoft ?? 3))); });
   }
 
   if (loadedModel) {
@@ -909,10 +908,9 @@ window._currentEmMul = emMul;
   { const __el = document.getElementById('sv-hemi'); if(__el) __el.textContent = hemi.toFixed(2); }
   { const __el = document.getElementById('sv-hemi-sky'); if(__el) __el.textContent = hemiSky.substring(0,7); }
   { const __el = document.getElementById('sv-hemi-gnd'); if(__el) __el.textContent = hemiGnd.substring(0,7); }
-{ const __el = document.getElementById('sv-emissive-mul'); if(__el) __el.textContent = emMul.toFixed(1); }
-  
- { const __el = document.getElementById('sv-spot-pen'); if(__el) __el.textContent = (window._spotPen ?? 0.5).toFixed(2); }
-{ const __el = document.getElementById('sv-bloom-str'); if(__el) __el.textContent = bStr.toFixed(2); }
+{ const __el = document.getElementById('sv-emissive-mul');
+ { const __el = document.getElementById('sv-pt-soft'); if(__el) __el.textContent = String(Math.round(window._ptSoft ?? 3)); } if(__el) __el.textContent = emMul.toFixed(1); }
+  { const __el = document.getElementById('sv-bloom-str'); if(__el) __el.textContent = bStr.toFixed(2); }
   { const __el = document.getElementById('sv-bloom-th'); if(__el) __el.textContent = bTh.toFixed(2); }
 };
 
@@ -930,8 +928,8 @@ window.resetLighting = function() {
   document.getElementById('sl-hemi-sky').value = d.hemiSky;
   document.getElementById('sl-hemi-gnd').value = d.hemiGnd;
 document.getElementById('sl-emissive-mul').value = d.emissiveMul;
- document.getElementById('sl-spot-pen').value = d.spotPen;
- window._spotPen = d.spotPen;
+ document.getElementById('sl-pt-soft').value = d.ptSoft;
+ window._ptSoft = d.ptSoft;
   document.getElementById('sl-bloom-str').value = d.bloomStr;
   document.getElementById('sl-bloom-th').value = d.bloomTh;
   updateLighting();
