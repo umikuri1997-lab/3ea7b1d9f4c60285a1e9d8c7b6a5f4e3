@@ -167,8 +167,8 @@
         <div class="slider-group-label">▸ 直射光 (Directional)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="8" step="0.1" value="3.0" id="sl-dir" oninput="updateLighting()">
-          <span class="slider-val" id="sv-dir">3.0</span>
+          <input type="range" min="0" max="20" step="0.1" value="10" id="sl-dir" oninput="updateLighting()">
+          <span class="slider-val" id="sv-dir">10.0</span>
         </div>
         <div class="slider-row">
           <label>色</label>
@@ -225,18 +225,18 @@
         <div class="slider-group-label">▸ マテリアル / ポスプロ</div>
         <div class="slider-row">
           <label>反射強度</label>
-          <input type="range" min="0" max="4" step="0.1" value="1.5" id="sl-envmap" oninput="updateLighting()">
-          <span class="slider-val" id="sv-envmap">1.5</span>
+          <input type="range" min="0" max="4" step="0.1" value="0.5" id="sl-envmap" oninput="updateLighting()">
+          <span class="slider-val" id="sv-envmap">0.5</span>
         </div>
         <div class="slider-row">
           <label>放射光 強度</label>
-          <input type="range" min="0" max="10" step="0.1" value="1.0" id="sl-emissive-mul" oninput="updateLighting()">
-          <span class="slider-val" id="sv-emissive-mul">1.0</span>
+          <input type="range" min="0" max="10" step="0.1" value="5.0" id="sl-emissive-mul" oninput="updateLighting()">
+          <span class="slider-val" id="sv-emissive-mul">5.0</span>
         </div>
         <div class="slider-row">
           <label>Bloom 強度</label>
-          <input type="range" min="0" max="0.5" step="0.01" value="0.06" id="sl-bloom-str" oninput="updateLighting()">
-          <span class="slider-val" id="sv-bloom-str">0.06</span>
+          <input type="range" min="0" max="0.5" step="0.01" value="0.03" id="sl-bloom-str" oninput="updateLighting()">
+          <span class="slider-val" id="sv-bloom-str">0.03</span>
         </div>
         <div class="slider-row">
           <label>Bloom 閾値</label>
@@ -328,7 +328,7 @@ const renderPass = new RenderPass(scene, walkCamera);
 composer.addPass(renderPass);
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.06, 0.4, 0.9
+  0.03, 0.4, 0.9
 );
 composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
@@ -337,7 +337,7 @@ composer.addPass(new OutputPass());
 const ambient = new THREE.AmbientLight(0xffffff, 0.8);
 scene.add(ambient);
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 3.0);
+const dirLight = new THREE.DirectionalLight(0xffffff, 10);
 dirLight.position.set(15, 30, 15);
 dirLight.castShadow = true;
 // 高品質影の設定
@@ -530,7 +530,7 @@ function loadGLB(url, displayUrl) {
         // マテリアルの環境反射を強化
         mats.forEach(mat => {
           if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
-            mat.envMapIntensity = 1.5;
+            mat.envMapIntensity = 0.5;
             mat.needsUpdate = true;
           }
         });
@@ -574,17 +574,13 @@ function loadGLB(url, displayUrl) {
     emissiveCandidates.sort((a, b) => b.intensity - a.intensity);
     const toPlace = emissiveCandidates.slice(0, maxEmissiveLights);
     toPlace.forEach((c, i) => {
-      const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, Math.PI / 3, 0.5);
+      const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, Math.PI * 2 / 3, 0.5);
       sl.position.copy(c.pos);
-      // 影付きは最大6個（DirectionalLight+マテリアルテクスチャ分を確保）
-      if (i < 6) {
-        sl.castShadow = true;
-        sl.shadow.mapSize.width = 512;
-        sl.shadow.mapSize.height = 512;
-        sl.shadow.bias = -0.002;
-      } else {
-        sl.castShadow = false;
-      }
+      // 影は動的に最寄り6個だけ有効化
+      sl.castShadow = false;
+      sl.shadow.mapSize.width = 512;
+      sl.shadow.mapSize.height = 512;
+      sl.shadow.bias = -0.002;
       sl.userData.baseIntensity = c.intensity;
       // ターゲットを真下に
       sl.target.position.set(c.pos.x, c.pos.y - 1, c.pos.z);
@@ -687,19 +683,16 @@ window.switchCamera = function(idx) {
     pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
   }
 
-  // 外観・外部カメラは反射を抑える
-  const isExterior = /外観|外部/.test(camName);
-  const envVal = isExterior ? 0.5 : LIGHT_DEFAULTS.envmap;
-  document.getElementById('sl-envmap').value = envVal;
-  if (loadedModel) {
-    loadedModel.traverse(obj => {
-      if (obj.isMesh) {
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        mats.forEach(m => { if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) m.envMapIntensity = envVal; });
-      }
+  // カメラ位置に最も近いSpotLight 6個の影を有効化
+  if (window._emissiveLights && window._emissiveLights.length > 0) {
+    const camPos = walkCamera.position;
+    const sorted = window._emissiveLights
+      .map(l => ({ light: l, dist: camPos.distanceTo(l.position) }))
+      .sort((a, b) => a.dist - b.dist);
+    sorted.forEach((item, i) => {
+      item.light.castShadow = i < 6;
     });
   }
-  document.getElementById('sv-envmap').textContent = envVal.toFixed(1);
 
   document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
   document.querySelectorAll('.cam-item').forEach(el => el.classList.toggle('active', parseInt(el.dataset.idx) === idx));
@@ -832,10 +825,10 @@ window.closeLoadDialog = function() {
 
 // ===== LIGHTING ADJUST =====
 const LIGHT_DEFAULTS = {
-  exposure:1.0, dir:3.0, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
+  exposure:1.0, dir:10, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
   amb:0.8, ambColor:'#ffffff',
   hemi:0, hemiSky:'#ffffff', hemiGnd:'#ffffff',
-  envmap:1.5, emissiveMul:1.0, bloomStr:0.06, bloomTh:0.9
+  envmap:0.5, emissiveMul:5.0, bloomStr:0.03, bloomTh:0.9
 };
 let dirLightDist = 50; // モデル読み込み時に更新
 let dirLightCenter = new THREE.Vector3();
