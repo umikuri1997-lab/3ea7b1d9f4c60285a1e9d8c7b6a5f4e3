@@ -1,11 +1,10 @@
 <!DOCTYPE html>
-
 <html lang="ja">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GLB Walkthrough Viewer</title>
-<link href="data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'&gt;&lt;rect width='32' height='32' rx='6' fill='%230a0a0b'/&gt;&lt;path d='M6 22 L11 10 L16 18 L19 13 L26 22Z' fill='%23c8ff00' opacity='0.9'/&gt;&lt;circle cx='22' cy='10' r='3' fill='%23c8ff00' opacity='0.6'/&gt;&lt;/svg&gt;" rel="icon" type="image/svg+xml"/>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230a0a0b'/><path d='M6 22 L11 10 L16 18 L19 13 L26 22Z' fill='%23c8ff00' opacity='0.9'/><circle cx='22' cy='10' r='3' fill='%23c8ff00' opacity='0.6'/></svg>">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap');
   :root {
@@ -115,161 +114,181 @@
 <body>
 <div id="canvas-container"></div>
 <div id="ui">
-<div id="topbar">
-<div id="logo">Walk<span style="color:var(--text)">View</span></div>
-<div id="model-name">GLBファイルを読み込んでください</div>
-<button class="btn secondary" id="btn-reload" onclick="showLoadDialog()" style="display:none">変更</button>
-</div>
-<button id="panel-toggle" onclick="togglePanel()">☰</button>
-<div id="panel-left">
-<!-- Camera section -->
-<div class="panel-section">
-<div class="panel-header open" onclick="toggleSection(this)">
-<span>📷 カメラ</span><span class="arrow">▾</span>
-</div>
-<div class="panel-body open" id="camera-list">
-<div style="padding:16px 20px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">GLBを読み込むと表示</div>
-</div>
-</div>
-<!-- HDR section -->
-<div class="panel-section">
-<div class="panel-header" onclick="toggleSection(this)">
-<span>🌅 HDR 環境光</span><span class="arrow">▾</span>
-</div>
-<div class="panel-body" id="hdr-body">
-<div class="hdr-toggle-row">
-<span class="hdr-toggle-label">背景に表示</span>
-<label class="mini-toggle">
-<input checked="" id="hdr-bg-toggle" onchange="toggleHDRBackground()" type="checkbox"/>
-<div class="mini-slider"></div>
-</label>
-</div>
-<div class="hdr-presets" id="hdr-presets"></div>
-</div>
-</div>
-<!-- Lighting adjust -->
-<div class="panel-section">
-<div class="panel-header" onclick="toggleSection(this)">
-<span>💡 ライティング調整</span><span class="arrow">▾</span>
-</div>
-<div class="panel-body" id="light-body">
-<div class="slider-group-label">▸ トーンマッピング</div>
-<div class="slider-row">
-<label>露出</label>
-<input id="sl-exposure" max="3" min="0.1" oninput="updateLighting()" step="0.05" type="range" value="0.8"/>
-          \10.30\3
+  <div id="topbar">
+    <div id="logo">Walk<span style="color:var(--text)">View</span></div>
+    <div id="model-name">GLBファイルを読み込んでください</div>
+    <button class="btn secondary" id="btn-reload" style="display:none" onclick="showLoadDialog()">変更</button>
+  </div>
+
+  <button id="panel-toggle" onclick="togglePanel()">☰</button>
+
+  <div id="panel-left">
+    <!-- Camera section -->
+    <div class="panel-section">
+      <div class="panel-header open" onclick="toggleSection(this)">
+        <span>📷 カメラ</span><span class="arrow">▾</span>
+      </div>
+      <div class="panel-body open" id="camera-list">
+        <div style="padding:16px 20px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">GLBを読み込むと表示</div>
+      </div>
+    </div>
+
+    <!-- HDR section -->
+    <div class="panel-section">
+      <div class="panel-header" onclick="toggleSection(this)">
+        <span>🌅 HDR 環境光</span><span class="arrow">▾</span>
+      </div>
+      <div class="panel-body" id="hdr-body">
+        <div class="hdr-toggle-row">
+          <span class="hdr-toggle-label">背景に表示</span>
+          <label class="mini-toggle">
+            <input type="checkbox" id="hdr-bg-toggle" checked onchange="toggleHDRBackground()">
+            <div class="mini-slider"></div>
+          </label>
         </div>
-<div class="slider-group-label">▸ 直射光 (Directional)</div>
-<div class="slider-row">
-<label>強度</label>
-<input id="sl-dir" max="20" min="0" oninput="updateLighting()" step="0.1" type="range" value="5"/>
-<span class="slider-val" id="sv-dir">5.0</span>
-</div>
-<div class="slider-row">
-<label>色</label>
-<input id="sl-dir-color" oninput="updateLighting()" type="color" value="#ffffff"/>
-<span class="slider-val" id="sv-dir-color">#fff</span>
-</div>
-<div class="slider-row">
-<label>水平角</label>
-<input id="sl-dir-azimuth" max="360" min="0" oninput="updateLighting()" step="1" type="range" value="45"/>
-<span class="slider-val" id="sv-dir-azimuth">45°</span>
-</div>
-<div class="slider-row">
-<label>仰角</label>
-<input id="sl-dir-elevation" max="90" min="5" oninput="updateLighting()" step="1" type="range" value="45"/>
-          \145°\3
+        <div class="hdr-presets" id="hdr-presets"></div>
+      </div>
+    </div>
+
+    <!-- Lighting adjust -->
+    <div class="panel-section">
+      <div class="panel-header" onclick="toggleSection(this)">
+        <span>💡 ライティング調整</span><span class="arrow">▾</span>
+      </div>
+      <div class="panel-body" id="light-body">
+
+        <div class="slider-group-label">▸ トーンマッピング</div>
+        <div class="slider-row">
+          <label>露出</label>
+          <input type="range" min="0.1" max="3" step="0.05" value="1.0" id="sl-exposure" oninput="updateLighting()">
+          <span class="slider-val" id="sv-exposure">1.00</span>
         </div>
-<div class="hdr-toggle-row" style="padding:4px 16px 8px">
-<span class="hdr-toggle-label">影</span>
-<label class="mini-toggle">
-<input checked="" id="sl-dir-shadow" oninput="updateLighting()" type="checkbox"/>
-<div class="mini-slider"></div>
-</label>
-</div>
-<div class="slider-group-label">▸ 環境光 (Ambient)</div>
-<div class="slider-row">
-<label>強度</label>
-<input id="sl-amb" max="5" min="0" oninput="updateLighting()" step="0.01" type="range" value="2"/>
-          \12.00\3
+
+        <div class="slider-group-label">▸ 直射光 (Directional)</div>
+        <div class="slider-row">
+          <label>強度</label>
+          <input type="range" min="0" max="20" step="0.1" value="10" id="sl-dir" oninput="updateLighting()">
+          <span class="slider-val" id="sv-dir">10.0</span>
         </div>
-<div class="slider-row">
-<label>色</label>
-<input id="sl-amb-color" oninput="updateLighting()" type="color" value="#ffffff"/>
-<span class="slider-val" id="sv-amb-color">#fff</span>
-</div>
-<div class="slider-group-label">▸ 半球光 (Hemisphere)</div>
-<div class="slider-row">
-<label>強度</label>
-<input id="sl-hemi" max="2" min="0" oninput="updateLighting()" step="0.01" type="range" value="2"/>
-          \12.00\3
+        <div class="slider-row">
+          <label>色</label>
+          <input type="color" value="#ffffff" id="sl-dir-color" oninput="updateLighting()">
+          <span class="slider-val" id="sv-dir-color">#fff</span>
         </div>
-<div class="slider-row">
-<label>天空色</label>
-<input id="sl-hemi-sky" oninput="updateLighting()" type="color" value="#ffffff"/>
-<span class="slider-val" id="sv-hemi-sky">#fff</span>
-</div>
-<div class="slider-row">
-<label>地面色</label>
-<input id="sl-hemi-gnd" oninput="updateLighting()" type="color" value="#ffffff"/>
-<span class="slider-val" id="sv-hemi-gnd">#ffffff</span>
-</div>
-<div class="slider-group-label">▸ マテリアル / ポスプロ</div>
-<div class="slider-row"><label>ポイント 影ぼかし</label><input id="sl-pt-soft" max="10" min="0" oninput="updateLighting()" step="1" type="range" value="3"/><span class="slider-val" id="sv-pt-soft">3</span></div>
-<div class="slider-row">
-<label>放射光 強度</label>
-<input id="sl-emissive-mul" max="10" min="0" oninput="updateLighting()" step="0.1" type="range" value="2.0"/>
-          \12.0\3
+        <div class="slider-row">
+          <label>水平角</label>
+          <input type="range" min="0" max="360" step="1" value="45" id="sl-dir-azimuth" oninput="updateLighting()">
+          <span class="slider-val" id="sv-dir-azimuth">45°</span>
         </div>
-<div class="slider-row">
-<label>Bloom 強度</label>
-<input id="sl-bloom-str" max="0.5" min="0" oninput="updateLighting()" step="0.01" type="range" value="0.03"/>
-<span class="slider-val" id="sv-bloom-str">0.03</span>
-</div>
-<div class="slider-row">
-<label>Bloom 閾値</label>
-<input id="sl-bloom-th" max="1.5" min="0" oninput="updateLighting()" step="0.01" type="range" value="0.9"/>
-<span class="slider-val" id="sv-bloom-th">0.90</span>
-</div>
-<div style="padding:4px 16px 12px">
-<button class="btn secondary" onclick="resetLighting()" style="width:100%;padding:6px;font-size:10px">リセット</button>
-</div>
-</div>
-</div>
-<!-- Controls -->
-<div style="margin-top:auto;">
-<div id="controls-hint">
-<span class="hint-key">W A S D</span> 移動<br/>
-<span class="hint-key">Mouse</span> 視点<br/>
-<span class="hint-key">Space</span> 上昇  <span class="hint-key">Shift</span> 下降<br/>
-<span class="hint-key">Esc</span> 解放<br/>
-<br/>
-<span style="color:var(--accent)">📱 モバイル</span><br/>
-        左半分ドラッグ → 移動<br/>
+        <div class="slider-row">
+          <label>仰角</label>
+          <input type="range" min="5" max="90" step="1" value="60" id="sl-dir-elevation" oninput="updateLighting()">
+          <span class="slider-val" id="sv-dir-elevation">60°</span>
+        </div>
+        <div class="hdr-toggle-row" style="padding:4px 16px 8px">
+          <span class="hdr-toggle-label">影</span>
+          <label class="mini-toggle">
+            <input type="checkbox" id="sl-dir-shadow" checked oninput="updateLighting()">
+            <div class="mini-slider"></div>
+          </label>
+        </div>
+
+        <div class="slider-group-label">▸ 環境光 (Ambient)</div>
+        <div class="slider-row">
+          <label>強度</label>
+          <input type="range" min="0" max="5" step="0.01" value="1" id="sl-amb" oninput="updateLighting()">
+          <span class="slider-val" id="sv-amb">1.00</span>
+        </div>
+        <div class="slider-row">
+          <label>色</label>
+          <input type="color" value="#ffffff" id="sl-amb-color" oninput="updateLighting()">
+          <span class="slider-val" id="sv-amb-color">#fff</span>
+        </div>
+
+        <div class="slider-group-label">▸ 半球光 (Hemisphere)</div>
+        <div class="slider-row">
+          <label>強度</label>
+          <input type="range" min="0" max="2" step="0.01" value="1" id="sl-hemi" oninput="updateLighting()">
+          <span class="slider-val" id="sv-hemi">1.00</span>
+        </div>
+        <div class="slider-row">
+          <label>天空色</label>
+          <input type="color" value="#ffffff" id="sl-hemi-sky" oninput="updateLighting()">
+          <span class="slider-val" id="sv-hemi-sky">#fff</span>
+        </div>
+        <div class="slider-row">
+          <label>地面色</label>
+          <input type="color" value="#ffffff" id="sl-hemi-gnd" oninput="updateLighting()">
+          <span class="slider-val" id="sv-hemi-gnd">#ffffff</span>
+        </div>
+
+        <div class="slider-group-label">▸ マテリアル / ポスプロ</div>
+        <div class="slider-row">
+          <label>反射強度</label>
+          <input type="range" min="0" max="4" step="0.1" value="0.5" id="sl-envmap" oninput="updateLighting()">
+          <span class="slider-val" id="sv-envmap">0.5</span>
+        </div>
+        <div class="slider-row">
+          <label>放射光 強度</label>
+          <input type="range" min="0" max="10" step="0.1" value="1.0" id="sl-emissive-mul" oninput="updateLighting()">
+          <span class="slider-val" id="sv-emissive-mul">1.0</span>
+        </div>
+        <div class="slider-row">
+          <label>Bloom 強度</label>
+          <input type="range" min="0" max="0.5" step="0.01" value="0.03" id="sl-bloom-str" oninput="updateLighting()">
+          <span class="slider-val" id="sv-bloom-str">0.03</span>
+        </div>
+        <div class="slider-row">
+          <label>Bloom 閾値</label>
+          <input type="range" min="0" max="1.5" step="0.01" value="0.9" id="sl-bloom-th" oninput="updateLighting()">
+          <span class="slider-val" id="sv-bloom-th">0.90</span>
+        </div>
+
+        <div style="padding:4px 16px 12px">
+          <button class="btn secondary" style="width:100%;padding:6px;font-size:10px" onclick="resetLighting()">リセット</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div style="margin-top:auto;">
+      <div id="controls-hint">
+        <span class="hint-key">W A S D</span> 移動<br>
+        <span class="hint-key">Mouse</span> 視点<br>
+        <span class="hint-key">Space</span> 上昇 &nbsp;<span class="hint-key">Shift</span> 下降<br>
+        <span class="hint-key">Esc</span> 解放<br>
+        <br>
+        <span style="color:var(--accent)">📱 モバイル</span><br>
+        左半分ドラッグ → 移動<br>
         右半分ドラッグ → 視点
       </div>
+    </div>
+  </div>
+
+  <div id="overlay-msg">
+    <div class="msg-box">
+      <div class="msg-title">Walk<span>View</span></div>
+      <div class="msg-sub">GLBウォークスルービューア<br>URLを入力して読み込み</div>
+      <div class="url-input-wrap">
+        <input class="url-input" id="glb-url-input" type="text" placeholder="https://...supabase.co/.../model.glb" />
+        <div class="input-hint">💡 アップローダーで生成されたURLを貼り付けてください</div>
+      </div>
+      <button class="btn" onclick="loadFromInput()" style="width:100%;padding:12px">GLBを読み込む →</button>
+      <button class="btn secondary" id="btn-close-overlay" onclick="closeLoadDialog()" style="width:100%;padding:10px;margin-top:8px;display:none">✕ 閉じる</button>
+    </div>
+    <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+  </div>
+
+  <div id="crosshair"></div>
+
+  <div id="lock-msg">クリックして歩行モード開始 — Escで解放</div>
+  <div id="fps-badge"></div>
 </div>
-</div>
-<div id="overlay-msg">
-<div class="msg-box">
-<div class="msg-title">Walk<span>View</span></div>
-<div class="msg-sub">GLBウォークスルービューア<br/>URLを入力して読み込み</div>
-<div class="url-input-wrap">
-<input class="url-input" id="glb-url-input" placeholder="https://...supabase.co/.../model.glb" type="text">
-<div class="input-hint">💡 アップローダーで生成されたURLを貼り付けてください</div>
-</input></div>
-<button class="btn" onclick="loadFromInput()" style="width:100%;padding:12px">GLBを読み込む →</button>
-<button class="btn secondary" id="btn-close-overlay" onclick="closeLoadDialog()" style="width:100%;padding:10px;margin-top:8px;display:none">✕ 閉じる</button>
-</div>
-<div id="loading-bar-wrap"><div id="loading-bar"></div></div>
-</div>
-<div id="crosshair"></div>
-<div id="lock-msg">クリックして歩行モード開始 — Escで解放</div>
-<div id="fps-badge"></div>
-</div>
+
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
 </script>
+
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -289,7 +308,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.8;
+renderer.toneMappingExposure = 1.0;
 container.appendChild(renderer.domElement);
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
@@ -315,10 +334,10 @@ composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 
 // ===== LIGHTING =====
-const ambient = new THREE.AmbientLight(0xffffff, 2);
+const ambient = new THREE.AmbientLight(0xffffff, 1);
 scene.add(ambient);
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 5);
+const dirLight = new THREE.DirectionalLight(0xffffff, 10);
 dirLight.position.set(15, 30, 15);
 dirLight.castShadow = true;
 // 高品質影の設定
@@ -334,7 +353,7 @@ dirLight.shadow.bias           = -0.0005;
 dirLight.shadow.normalBias     = 0.02;
 scene.add(dirLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 2);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 1);
 scene.add(hemiLight);
 
 // ===== HDR =====
@@ -363,15 +382,6 @@ pmremGenerator.compileEquirectangularShader();
 let currentEnvMap = null;
 let currentBgMap = null;
 let hdrBgEnabled = true;
-const HDR_BG_BASE_INTENSITY = 1.0;
-function updateBackgroundIntensity() {
-  // 露出変更がHDR背景の見た目の明るさに影響しないよう補正
-  if (hdrBgEnabled && currentBgMap) {
-    const exp = renderer.toneMappingExposure || 1.0;
-    scene.backgroundIntensity = HDR_BG_BASE_INTENSITY / exp;
-  }
-}
-
 let activeHdrIdx = -1;
 let HDR_PRESETS = [];
 
@@ -448,7 +458,7 @@ function loadHDR(idx) {
       scene.environment = currentEnvMap;
       if (hdrBgEnabled) {
         scene.background = currentBgMap;
-        updateBackgroundIntensity();
+        scene.backgroundIntensity = 1.0;
       }
       resolve();
     }, undefined, (err) => {
@@ -462,7 +472,7 @@ window.toggleHDRBackground = function() {
   hdrBgEnabled = document.getElementById('hdr-bg-toggle').checked;
   if (hdrBgEnabled && currentBgMap) {
     scene.background = currentBgMap;
-    updateBackgroundIntensity();
+    scene.backgroundIntensity = 1.0;
     scene.fog = null;
   } else {
     scene.background = new THREE.Color(0x0a0a0b);
@@ -564,16 +574,19 @@ function loadGLB(url, displayUrl) {
     emissiveCandidates.sort((a, b) => b.intensity - a.intensity);
     const toPlace = emissiveCandidates.slice(0, maxEmissiveLights);
     toPlace.forEach((c, i) => {
-      const pl = new THREE.PointLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(80), 0.5);
-      pl.position.copy(c.pos);
+      const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(80), 0.5);
+      sl.position.copy(c.pos);
       // 影は動的に最寄り6個だけ有効化
-      pl.castShadow = false;
-      pl.shadow.mapSize.width = 1024;
-      pl.shadow.mapSize.height = 1024;
-      pl.shadow.bias = -0.002;
- pl.shadow.radius = Math.max(0, Math.round(window._ptSoft ?? 3));
-      pl.userData.baseIntensity = c.intensity;
-window._emissiveLights.push(pl);
+      sl.castShadow = false;
+      sl.shadow.mapSize.width = 1024;
+      sl.shadow.mapSize.height = 1024;
+      sl.shadow.bias = -0.002;
+      sl.userData.baseIntensity = c.intensity;
+      // ターゲットを真下に
+      sl.target.position.set(c.pos.x, c.pos.y - 1, c.pos.z);
+      scene.add(sl);
+      scene.add(sl.target);
+      window._emissiveLights.push(sl);
     });
     if (toPlace.length > 0) {
       console.log(`EmissiveSpotLight: ${toPlace.length}個配置（影付き${Math.min(toPlace.length,6)}個 / 候補${emissiveCandidates.length}個）`);
@@ -614,7 +627,7 @@ window._emissiveLights.push(pl);
     document.getElementById('btn-reload').style.display = '';
     document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
     const parts = (displayUrl || url).split('/');
-    { const __el = document.getElementById('model-name'); if(__el) __el.textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb'); }
+    document.getElementById('model-name').textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb');
     activeCamera = walkCamera;
     activeCamIdx = -1;
     // GLBカメラがあれば最初のカメラ位置からスタート
@@ -636,8 +649,7 @@ function buildCameraList() {
   list.innerHTML = '';
   const walkItem = document.createElement('div');
   walkItem.className = 'cam-item active'; walkItem.dataset.idx = '-1';
-  walkItem.innerHTML = `<div class="cam-icon">🚶</div>
-<div class="cam-label">ウォークスルー</div>`;
+  walkItem.innerHTML = `<div class="cam-icon">🚶</div><div class="cam-label">ウォークスルー</div>`;
   walkItem.onclick = () => switchCamera(-1);
   list.appendChild(walkItem);
   if (!glbCameras.length) {
@@ -648,8 +660,7 @@ function buildCameraList() {
     glbCameras.forEach((cam, i) => {
       const item = document.createElement('div');
       item.className = 'cam-item'; item.dataset.idx = i;
-      item.innerHTML = `<div class="cam-icon">📷</div>
-<div class="cam-label">${cam.name || 'Camera ' + (i+1)}</div>`;
+      item.innerHTML = `<div class="cam-icon">📷</div><div class="cam-label">${cam.name || 'Camera ' + (i+1)}</div>`;
       item.onclick = () => switchCamera(i); list.appendChild(item);
     });
   }
@@ -677,7 +688,7 @@ window.switchCamera = function(idx) {
   const dirVal = isExterior ? 3 : LIGHT_DEFAULTS.dir;
   dirLight.intensity = dirVal;
   document.getElementById('sl-dir').value = dirVal;
-  { const __el = document.getElementById('sv-dir'); if(__el) __el.textContent = dirVal.toFixed(1); }
+  document.getElementById('sv-dir').textContent = dirVal.toFixed(1);
 
   // カメラ位置に最も近いSpotLight 6個の影を有効化
   if (window._emissiveLights && window._emissiveLights.length > 0) {
@@ -799,7 +810,7 @@ window.togglePanel = function() {
   panelOpen = !panelOpen;
   document.getElementById('panel-left').classList.toggle('open', panelOpen);
   document.getElementById('panel-toggle').classList.toggle('open', panelOpen);
-  { const __el = document.getElementById('panel-toggle'); if(__el) __el.textContent = panelOpen ? '✕' : '☰'; }
+  document.getElementById('panel-toggle').textContent = panelOpen ? '✕' : '☰';
 };
 window.toggleSection = function(header) {
   header.classList.toggle('open');
@@ -821,14 +832,11 @@ window.closeLoadDialog = function() {
 
 // ===== LIGHTING ADJUST =====
 const LIGHT_DEFAULTS = {
-  exposure:0.8, dir:5, dirColor:'#ffffff', dirAzimuth:45, dirElevation:45, dirShadow:true,
-  amb:2, ambColor:'#ffffff',
-  hemi:2, hemiSky:'#ffffff', hemiGnd:'#ffffff',
- emissiveMul:2.0, 
- ptSoft:3, bloomStr:0.03, bloomTh:0.9
+  exposure:1.0, dir:10, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
+  amb:1, ambColor:'#ffffff',
+  hemi:1, hemiSky:'#ffffff', hemiGnd:'#ffffff',
+  envmap:0.5, emissiveMul:1.0, bloomStr:0.03, bloomTh:0.9
 };
-window._currentEmMul = LIGHT_DEFAULTS.emissiveMul;
-
 let dirLightDist = 50; // モデル読み込み時に更新
 let dirLightCenter = new THREE.Vector3();
 
@@ -847,16 +855,12 @@ window.updateLighting = function() {
   const hemi = v('sl-hemi');
   const hemiSky = c('sl-hemi-sky');
   const hemiGnd = c('sl-hemi-gnd');
-const emMul = v('sl-emissive-mul');
- 
- const ptSoft = v('sl-pt-soft');
- window._ptSoft = ptSoft;
-window._currentEmMul = emMul;
+  const env = v('sl-envmap');
+  const emMul = v('sl-emissive-mul');
   const bStr = v('sl-bloom-str');
   const bTh = v('sl-bloom-th');
 
   renderer.toneMappingExposure = exposure;
- updateBackgroundIntensity();
 
   dirLight.intensity = dir;
   dirLight.color.set(dirColor);
@@ -885,33 +889,32 @@ window._currentEmMul = emMul;
   // Emissiveライト強度を一括調整
   if (window._emissiveLights) {
     window._emissiveLights.forEach(l => { l.intensity = l.userData.baseIntensity * emMul; });
- window._emissiveLights.forEach(l => { l.shadow.radius = Math.max(0, Math.round((window._ptSoft ?? 3))); });
   }
 
   if (loadedModel) {
     loadedModel.traverse(obj => {
       if (obj.isMesh) {
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        mats.forEach(m => { if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) m.envMapIntensity = 0.5; });
+        mats.forEach(m => { if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) m.envMapIntensity = env; });
       }
     });
   }
 
   // 値表示を更新
-  { const __el = document.getElementById('sv-exposure'); if(__el) __el.textContent = exposure.toFixed(2); }
-  { const __el = document.getElementById('sv-dir'); if(__el) __el.textContent = dir.toFixed(1); }
-  { const __el = document.getElementById('sv-dir-color'); if(__el) __el.textContent = dirColor.substring(0,7); }
-  { const __el = document.getElementById('sv-dir-azimuth'); if(__el) __el.textContent = azimuth + '°'; }
-  { const __el = document.getElementById('sv-dir-elevation'); if(__el) __el.textContent = elevation + '°'; }
-  { const __el = document.getElementById('sv-amb'); if(__el) __el.textContent = amb.toFixed(2); }
-  { const __el = document.getElementById('sv-amb-color'); if(__el) __el.textContent = ambColor.substring(0,7); }
-  { const __el = document.getElementById('sv-hemi'); if(__el) __el.textContent = hemi.toFixed(2); }
-  { const __el = document.getElementById('sv-hemi-sky'); if(__el) __el.textContent = hemiSky.substring(0,7); }
-  { const __el = document.getElementById('sv-hemi-gnd'); if(__el) __el.textContent = hemiGnd.substring(0,7); }
-{ const __el = document.getElementById('sv-emissive-mul');
- { const __el = document.getElementById('sv-pt-soft'); if(__el) __el.textContent = String(Math.round(window._ptSoft ?? 3)); } if(__el) __el.textContent = emMul.toFixed(1); }
-  { const __el = document.getElementById('sv-bloom-str'); if(__el) __el.textContent = bStr.toFixed(2); }
-  { const __el = document.getElementById('sv-bloom-th'); if(__el) __el.textContent = bTh.toFixed(2); }
+  document.getElementById('sv-exposure').textContent = exposure.toFixed(2);
+  document.getElementById('sv-dir').textContent = dir.toFixed(1);
+  document.getElementById('sv-dir-color').textContent = dirColor.substring(0,7);
+  document.getElementById('sv-dir-azimuth').textContent = azimuth + '°';
+  document.getElementById('sv-dir-elevation').textContent = elevation + '°';
+  document.getElementById('sv-amb').textContent = amb.toFixed(2);
+  document.getElementById('sv-amb-color').textContent = ambColor.substring(0,7);
+  document.getElementById('sv-hemi').textContent = hemi.toFixed(2);
+  document.getElementById('sv-hemi-sky').textContent = hemiSky.substring(0,7);
+  document.getElementById('sv-hemi-gnd').textContent = hemiGnd.substring(0,7);
+  document.getElementById('sv-envmap').textContent = env.toFixed(1);
+  document.getElementById('sv-emissive-mul').textContent = emMul.toFixed(1);
+  document.getElementById('sv-bloom-str').textContent = bStr.toFixed(2);
+  document.getElementById('sv-bloom-th').textContent = bTh.toFixed(2);
 };
 
 window.resetLighting = function() {
@@ -927,9 +930,8 @@ window.resetLighting = function() {
   document.getElementById('sl-hemi').value = d.hemi;
   document.getElementById('sl-hemi-sky').value = d.hemiSky;
   document.getElementById('sl-hemi-gnd').value = d.hemiGnd;
-document.getElementById('sl-emissive-mul').value = d.emissiveMul;
- document.getElementById('sl-pt-soft').value = d.ptSoft;
- window._ptSoft = d.ptSoft;
+  document.getElementById('sl-envmap').value = d.envmap;
+  document.getElementById('sl-emissive-mul').value = d.emissiveMul;
   document.getElementById('sl-bloom-str').value = d.bloomStr;
   document.getElementById('sl-bloom-th').value = d.bloomTh;
   updateLighting();
@@ -945,50 +947,16 @@ window.addEventListener('resize', () => {
   bloomPass.resolution.set(window.innerWidth, window.innerHeight);
 });
 
-// ===== SPOTLIGHT CULLING (Emissive SpotLights) =====
-// カメラから半径5m(シーン単位)以内のみ有効化して負荷を軽減
-const SPOT_CULL_RADIUS = 5;
-const SPOT_CULL_RADIUS2 = SPOT_CULL_RADIUS * SPOT_CULL_RADIUS;
-const SPOT_CULL_INTERVAL = 3; // 毎フレームではなく数フレームに1回
-let _spotCullTick = 0;
-const _tmpCamPos = new THREE.Vector3();
-function updateEmissiveSpotCulling(cam) {
-  if (!window._emissiveLights || window._emissiveLights.length === 0) return;
-  if ((_spotCullTick++ % SPOT_CULL_INTERVAL) !== 0) return;
-  _tmpCamPos.copy(cam.position);
-  // まず影を全OFF → 近い6個だけON
-  for (const l of window._emissiveLights) l.castShadow = false;
-  const bestD2 = [Infinity, Infinity, Infinity, Infinity, Infinity, Infinity];
-  const bestL  = [null, null, null, null, null, null];
-  const mul = (window._currentEmMul != null) ? window._currentEmMul : 1.0;
-  for (const l of window._emissiveLights) {
-    const d2 = _tmpCamPos.distanceToSquared(l.position);
-    const active = d2 <= SPOT_CULL_RADIUS2;
-    l.visible = active;
-    if (!active) { l.intensity = 0; continue; }
-    l.intensity = l.userData.baseIntensity * mul;
-    for (let k = 0; k < 6; k++) {
-      if (d2 < bestD2[k]) {
-        for (let j = 5; j > k; j--) { bestD2[j] = bestD2[j-1]; bestL[j] = bestL[j-1]; }
-        bestD2[k] = d2; bestL[k] = l;
-        break;
-      }
-    }
-  }
-  for (const l of bestL) { if (l) l.castShadow = true; }
-}
-
 // ===== RENDER LOOP =====
 let lastTime = 0, frameCount = 0;
 function animate(time) {
   requestAnimationFrame(animate);
   updateWalk();
- updateEmissiveSpotCulling(activeCamera);
   renderPass.camera = activeCamera;
   composer.render();
   frameCount++;
   if (time - lastTime > 1000) {
-    { const __el = document.getElementById('fps-badge'); if(__el) __el.textContent = frameCount + ' fps'; }
+    document.getElementById('fps-badge').textContent = frameCount + ' fps';
     frameCount = 0; lastTime = time;
   }
 }
