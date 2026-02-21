@@ -160,8 +160,8 @@
         <div class="slider-group-label">▸ トーンマッピング</div>
         <div class="slider-row">
           <label>露出</label>
-          <input type="range" min="0.1" max="3" step="0.05" value="1.0" id="sl-exposure" oninput="updateLighting()">
-          <span class="slider-val" id="sv-exposure">1.00</span>
+          <input type="range" min="0.1" max="3" step="0.05" value="0.7" id="sl-exposure" oninput="updateLighting()">
+          <span class="slider-val" id="sv-exposure">0.70</span>
         </div>
 
         <div class="slider-group-label">▸ 直射光 (Directional)</div>
@@ -196,8 +196,8 @@
         <div class="slider-group-label">▸ 環境光 (Ambient)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="5" step="0.01" value="1" id="sl-amb" oninput="updateLighting()">
-          <span class="slider-val" id="sv-amb">1.00</span>
+          <input type="range" min="0" max="5" step="0.01" value="0.3" id="sl-amb" oninput="updateLighting()">
+          <span class="slider-val" id="sv-amb">0.30</span>
         </div>
         <div class="slider-row">
           <label>色</label>
@@ -208,8 +208,8 @@
         <div class="slider-group-label">▸ 半球光 (Hemisphere)</div>
         <div class="slider-row">
           <label>強度</label>
-          <input type="range" min="0" max="2" step="0.01" value="1" id="sl-hemi" oninput="updateLighting()">
-          <span class="slider-val" id="sv-hemi">1.00</span>
+          <input type="range" min="0" max="2" step="0.01" value="0.3" id="sl-hemi" oninput="updateLighting()">
+          <span class="slider-val" id="sv-hemi">0.30</span>
         </div>
         <div class="slider-row">
           <label>天空色</label>
@@ -235,8 +235,8 @@
         </div>
         <div class="slider-row">
           <label>Bloom 強度</label>
-          <input type="range" min="0" max="0.5" step="0.01" value="0.03" id="sl-bloom-str" oninput="updateLighting()">
-          <span class="slider-val" id="sv-bloom-str">0.03</span>
+          <input type="range" min="0" max="0.5" step="0.01" value="0.05" id="sl-bloom-str" oninput="updateLighting()">
+          <span class="slider-val" id="sv-bloom-str">0.05</span>
         </div>
         <div class="slider-row">
           <label>Bloom 閾値</label>
@@ -308,7 +308,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 0.7;
 container.appendChild(renderer.domElement);
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
@@ -316,7 +316,7 @@ const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0a0b);
 
-const walkCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 500);
+const walkCamera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.01, 500);
 walkCamera.position.set(0, 1.6, 0);
 let activeCamera = walkCamera;
 let glbCameras = [];
@@ -328,13 +328,13 @@ const renderPass = new RenderPass(scene, walkCamera);
 composer.addPass(renderPass);
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.03, 0.4, 0.9
+  0.05, 0.4, 0.9
 );
 composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 
 // ===== LIGHTING =====
-const ambient = new THREE.AmbientLight(0xffffff, 1);
+const ambient = new THREE.AmbientLight(0xffffff, 0.3);
 scene.add(ambient);
 
 const dirLight = new THREE.DirectionalLight(0xffffff, 10);
@@ -353,7 +353,7 @@ dirLight.shadow.bias           = -0.0005;
 dirLight.shadow.normalBias     = 0.02;
 scene.add(dirLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 1);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.3);
 scene.add(hemiLight);
 
 // ===== HDR =====
@@ -538,12 +538,14 @@ function loadGLB(url, displayUrl) {
     });
     scene.add(gltf.scene);
 
-    // Emissive → SpotLight 自動生成（下向き照射）
+    // Emissive → SpotLight 自動生成（下向き照射）※モバイルではスキップ
     // 前回のemissiveライトをクリア
     if (window._emissiveLights) {
       window._emissiveLights.forEach(l => { scene.remove(l); if(l.target) scene.remove(l.target); });
     }
     window._emissiveLights = [];
+
+    if (!isMobile) {
     const emissiveThreshold = 100;
     const maxEmissiveLights = 32;
     const emissiveCandidates = [];
@@ -574,13 +576,14 @@ function loadGLB(url, displayUrl) {
     emissiveCandidates.sort((a, b) => b.intensity - a.intensity);
     const toPlace = emissiveCandidates.slice(0, maxEmissiveLights);
     toPlace.forEach((c, i) => {
-      const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(80), 0.5);
+      const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(60), 0.5);
       sl.position.copy(c.pos);
       // 影は動的に最寄り6個だけ有効化
       sl.castShadow = false;
-      sl.shadow.mapSize.width = 1024;
-      sl.shadow.mapSize.height = 1024;
-      sl.shadow.bias = -0.002;
+      sl.shadow.mapSize.width = 2048;
+      sl.shadow.mapSize.height = 2048;
+      sl.shadow.bias = -0.001;
+      sl.shadow.normalBias = 0.02;
       sl.userData.baseIntensity = c.intensity;
       // ターゲットを真下に
       sl.target.position.set(c.pos.x, c.pos.y - 1, c.pos.z);
@@ -591,6 +594,7 @@ function loadGLB(url, displayUrl) {
     if (toPlace.length > 0) {
       console.log(`EmissiveSpotLight: ${toPlace.length}個配置（影付き${Math.min(toPlace.length,6)}個 / 候補${emissiveCandidates.length}個）`);
     }
+    } // end if (!isMobile)
 
     // Cameras
     glbCameras = [];
@@ -614,6 +618,15 @@ function loadGLB(url, displayUrl) {
     dirLightCenter.copy(center);
     dirLightDist = maxDim * 2;
     updateLighting(); // スライダー値で位置を設定
+
+    // モバイル: すべてのライトをOFF（パフォーマンス優先）
+    if (isMobile) {
+      dirLight.intensity = 0;
+      dirLight.castShadow = false;
+      ambient.intensity = 0;
+      hemiLight.intensity = 0;
+      renderer.shadowMap.enabled = false;
+    }
 
     // Walk camera position
     const eyeH = size.y * 0.35 + box.min.y;
@@ -685,7 +698,7 @@ window.switchCamera = function(idx) {
 
   // 外観・外部カメラはディレクショナルライトを抑える
   const isExterior = /外観|外部/.test(camName);
-  const dirVal = isExterior ? 3 : LIGHT_DEFAULTS.dir;
+  const dirVal = isExterior ? 5 : LIGHT_DEFAULTS.dir;
   dirLight.intensity = dirVal;
   document.getElementById('sl-dir').value = dirVal;
   document.getElementById('sv-dir').textContent = dirVal.toFixed(1);
@@ -832,10 +845,10 @@ window.closeLoadDialog = function() {
 
 // ===== LIGHTING ADJUST =====
 const LIGHT_DEFAULTS = {
-  exposure:1.0, dir:10, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
-  amb:1, ambColor:'#ffffff',
-  hemi:1, hemiSky:'#ffffff', hemiGnd:'#ffffff',
-  envmap:0.5, emissiveMul:1.0, bloomStr:0.03, bloomTh:0.9
+  exposure:0.7, dir:10, dirColor:'#ffffff', dirAzimuth:45, dirElevation:60, dirShadow:true,
+  amb:0.3, ambColor:'#ffffff',
+  hemi:0.3, hemiSky:'#ffffff', hemiGnd:'#ffffff',
+  envmap:0.5, emissiveMul:1.0, bloomStr:0.05, bloomTh:0.9
 };
 let dirLightDist = 50; // モデル読み込み時に更新
 let dirLightCenter = new THREE.Vector3();
