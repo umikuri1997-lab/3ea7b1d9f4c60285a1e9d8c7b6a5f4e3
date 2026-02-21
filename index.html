@@ -614,6 +614,7 @@ function loadGLB(url, displayUrl) {
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
+ _updateSpotCullRadiusFromModel(maxDim);
     dirLight.shadow.camera.left   = -maxDim;
     dirLight.shadow.camera.right  =  maxDim;
     dirLight.shadow.camera.top    =  maxDim;
@@ -628,14 +629,15 @@ function loadGLB(url, displayUrl) {
     const eyeH = size.y * 0.35 + box.min.y;
     walkCamera.position.set(center.x + Math.max(size.x, size.z) * 0.4, eyeH, center.z + Math.max(size.x, size.z) * 0.4);
     walkCamera.lookAt(center);
+ // モデル読み込み直後（初期視点）で一度だけ判定
+ updateEmissiveSpotCulling(walkCamera);
     yaw = -Math.PI / 4; pitch = 0;
 
     buildCameraList();
     overlay.style.display = 'none';
     loadBar.style.display = 'none';
     document.getElementById('btn-reload').style.display = '';
-    updateEmissiveSpotCulling(walkCamera);
- document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
+    document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
     const parts = (displayUrl || url).split('/');
     { const __el = document.getElementById('model-name'); if(__el) __el.textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb'); }
     activeCamera = walkCamera;
@@ -692,6 +694,9 @@ window.switchCamera = function(idx) {
     yaw = Math.atan2(-dir.x, -dir.z);
     pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
   }
+  // ここで『切り替え先カメラ位置』からスポットライトを判定
+  updateEmissiveSpotCulling(walkCamera);
+
 
   // 外観・外部カメラはディレクショナルライトを抑える
   const isExterior = /外観|外部/.test(camName);
@@ -962,9 +967,23 @@ window.addEventListener('resize', () => {
 });
 
 // ===== SPOTLIGHT CULLING (Emissive SpotLights) =====
+// 半径は『メートル』指定。モデルの単位（m/cm/mm）を推定してシーン単位へ変換
+const SPOT_CULL_RADIUS_METERS = 5;
+let _metersPerUnit = 1.0; // 1unitが何mか（推定）
+let _spotCullRadiusUnits = SPOT_CULL_RADIUS_METERS;
+let _spotCullRadius2 = _spotCullRadiusUnits * _spotCullRadiusUnits;
+function _updateSpotCullRadiusFromModel(maxDimUnits) {
+  // heuristic: very large models are often authored in cm or mm
+  if (maxDimUnits > 1000) _metersPerUnit = 0.001;
+  else if (maxDimUnits > 100) _metersPerUnit = 0.01;
+  else _metersPerUnit = 1.0;
+  _spotCullRadiusUnits = SPOT_CULL_RADIUS_METERS / _metersPerUnit;
+  _spotCullRadius2 = _spotCullRadiusUnits * _spotCullRadiusUnits;
+}
+
 // カメラから半径5m(シーン単位)以内のみ有効化して負荷を軽減
 const SPOT_CULL_RADIUS = 5;
-const SPOT_CULL_RADIUS2 = SPOT_CULL_RADIUS * SPOT_CULL_RADIUS;
+const _spotCullRadius2 = SPOT_CULL_RADIUS * SPOT_CULL_RADIUS;
 const SPOT_CULL_INTERVAL = 3; // 毎フレームではなく数フレームに1回
 let _spotCullTick = 0;
 const _tmpCamPos = new THREE.Vector3();
@@ -972,18 +991,19 @@ function updateEmissiveSpotCulling(cam) {
   const arr = window._emissiveLights;
   if (!arr || arr.length === 0) return;
   const camPos = cam.position;
-  // shadows off first
+  // shadows off
   for (let i = 0; i < arr.length; i++) arr[i].castShadow = false;
-  // nearest 6
   const bestD2 = [Infinity, Infinity, Infinity, Infinity, Infinity, Infinity];
   const bestL  = [null, null, null, null, null, null];
   const mul = (window._currentEmMul != null) ? window._currentEmMul : 1.0;
   for (let i = 0; i < arr.length; i++) {
     const l = arr[i];
     const d2 = camPos.distanceToSquared(l.position);
-    const active = d2 <= SPOT_CULL_RADIUS2;
+    const active = d2 <= _spotCullRadius2;
     l.visible = active;
     if (!active) { l.intensity = 0; continue; }
+    // baseIntensityが無い場合の保険
+    if (l.userData.baseIntensity == null) l.userData.baseIntensity = l.intensity;
     l.intensity = l.userData.baseIntensity * mul;
     for (let k = 0; k < 6; k++) {
       if (d2 < bestD2[k]) {
