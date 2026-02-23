@@ -505,6 +505,18 @@ let loadedModel = null;
 window.loadFromInput = function() {
   const raw = document.getElementById('glb-url-input').value.trim();
   if (!raw) return;
+  // モバイル: 全画面化+横固定
+  if (isMobile) {
+    const el = document.documentElement;
+    const rfs = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (rfs) {
+      rfs.call(el).then(() => {
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('landscape').catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  }
   let url = raw;
   try { url = encodeURI(decodeURI(raw)); } catch(e) {}
   loadGLB(url, raw);
@@ -1004,6 +1016,22 @@ const autoGlb = params.get('glb');
 if (autoGlb) {
   document.getElementById('glb-url-input').value = autoGlb;
   loadGLB(autoGlb, autoGlb);
+  // モバイル: 初回タップで全画面化+横固定
+  if (isMobile) {
+    const goFullscreen = () => {
+      const el = document.documentElement;
+      const rfs = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (rfs) {
+        rfs.call(el).then(() => {
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
+          }
+        }).catch(() => {});
+      }
+      document.removeEventListener('touchstart', goFullscreen);
+    };
+    document.addEventListener('touchstart', goFullscreen, { once: true });
+  }
 }
 </script>
 </body>
