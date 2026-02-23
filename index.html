@@ -325,6 +325,25 @@ container.appendChild(renderer.domElement);
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 if (isMobile) document.body.classList.add('is-mobile');
 
+function enterFullscreen() {
+  const el = document.documentElement;
+  try {
+    if (el.requestFullscreen) {
+      el.requestFullscreen().then(() => lockLandscape()).catch(() => {});
+    } else if (el.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen();
+      setTimeout(lockLandscape, 300);
+    }
+  } catch(e) {}
+}
+function lockLandscape() {
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('landscape').catch(() => {});
+    }
+  } catch(e) {}
+}
+
 // ===== SCENE =====
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0a0b);
@@ -506,17 +525,7 @@ window.loadFromInput = function() {
   const raw = document.getElementById('glb-url-input').value.trim();
   if (!raw) return;
   // モバイル: 全画面化+横固定
-  if (isMobile) {
-    const el = document.documentElement;
-    const rfs = el.requestFullscreen || el.webkitRequestFullscreen;
-    if (rfs) {
-      rfs.call(el).then(() => {
-        if (screen.orientation && screen.orientation.lock) {
-          screen.orientation.lock('landscape').catch(() => {});
-        }
-      }).catch(() => {});
-    }
-  }
+  if (isMobile) { enterFullscreen(); }
   let url = raw;
   try { url = encodeURI(decodeURI(raw)); } catch(e) {}
   loadGLB(url, raw);
@@ -748,11 +757,6 @@ window.switchCamera = function(idx) {
 let isLocked = false, yaw = 0, pitch = 0;
 const keys = {};
 const moveSpeed = isMobile ? 0.033 : 0.1;
-
-// モバイル: 横持ち固定
-if (isMobile && screen.orientation && screen.orientation.lock) {
-  screen.orientation.lock('landscape').catch(() => {});
-}
 
 renderer.domElement.addEventListener('click', () => {
   if (!loadedModel || isMobile) return;
@@ -1018,19 +1022,7 @@ if (autoGlb) {
   loadGLB(autoGlb, autoGlb);
   // モバイル: 初回タップで全画面化+横固定
   if (isMobile) {
-    const goFullscreen = () => {
-      const el = document.documentElement;
-      const rfs = el.requestFullscreen || el.webkitRequestFullscreen;
-      if (rfs) {
-        rfs.call(el).then(() => {
-          if (screen.orientation && screen.orientation.lock) {
-            screen.orientation.lock('landscape').catch(() => {});
-          }
-        }).catch(() => {});
-      }
-      document.removeEventListener('touchstart', goFullscreen);
-    };
-    document.addEventListener('touchstart', goFullscreen, { once: true });
+    document.addEventListener('touchstart', () => { enterFullscreen(); }, { once: true });
   }
 }
 </script>
