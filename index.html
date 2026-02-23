@@ -630,12 +630,16 @@ function loadGLB(url, displayUrl) {
     dirLightDist = maxDim * 2;
     updateLighting(); // スライダー値で位置を設定
 
-    // モバイル: 影をすべてOFF（パフォーマンス優先）
+    // モバイル: 影をすべてOFF（パフォーマンス優先）、ディレクショナルライト3、放射光0.1
     if (isMobile) {
+      dirLight.intensity = 3;
       dirLight.castShadow = false;
       renderer.shadowMap.enabled = false;
       if (window._emissiveLights) {
-        window._emissiveLights.forEach(l => { l.castShadow = false; });
+        window._emissiveLights.forEach(l => {
+          l.castShadow = false;
+          l.intensity = l.userData.baseIntensity * 0.1;
+        });
       }
     }
 
@@ -708,7 +712,7 @@ window.switchCamera = function(idx) {
 
   // 外観・外部カメラはディレクショナルライトを抑える
   const isExterior = /外観|外部/.test(camName);
-  const dirVal = isExterior ? 5 : LIGHT_DEFAULTS.dir;
+  const dirVal = isMobile ? 3 : (isExterior ? 5 : LIGHT_DEFAULTS.dir);
   dirLight.intensity = dirVal;
   document.getElementById('sl-dir').value = dirVal;
   document.getElementById('sv-dir').textContent = dirVal.toFixed(1);
@@ -890,9 +894,9 @@ window.updateLighting = function() {
 
   renderer.toneMappingExposure = exposure;
 
-  dirLight.intensity = dir;
+  dirLight.intensity = isMobile ? 3 : dir;
   dirLight.color.set(dirColor);
-  dirLight.castShadow = dirShadow;
+  dirLight.castShadow = isMobile ? false : dirShadow;
   // 方向を球面座標から計算
   const azRad = azimuth * Math.PI / 180;
   const elRad = elevation * Math.PI / 180;
@@ -914,9 +918,10 @@ window.updateLighting = function() {
   bloomPass.strength = bStr;
   bloomPass.threshold = bTh;
 
-  // Emissiveライト強度を一括調整
+  // Emissiveライト強度を一括調整（モバイルは0.1固定）
   if (window._emissiveLights) {
-    window._emissiveLights.forEach(l => { l.intensity = l.userData.baseIntensity * emMul; });
+    const effectiveMul = isMobile ? 0.1 : emMul;
+    window._emissiveLights.forEach(l => { l.intensity = l.userData.baseIntensity * effectiveMul; });
   }
 
   if (loadedModel) {
