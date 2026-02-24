@@ -200,7 +200,7 @@ async function refreshStorage() {
   try{
     let allFiles=[],offset=0;
     while(true){
-      const res=await fetch(`${sbUrl}/storage/v1/object/list/${sbBucket}`,{method:'POST',headers:{'Authorization':`Bearer ${sbKey}`,'Content-Type':'application/json'},body:JSON.stringify({prefix:'',limit:1000,offset,sortBy:{column:'name',order:'asc'}})});
+      const res=await fetch(`${sbUrl}/storage/v1/object/list/${sbBucket}`,{method:'POST',headers:{'Authorization':`Bearer ${sbKey}`,'apikey':sbKey,'Content-Type':'application/json'},body:JSON.stringify({prefix:'',limit:1000,offset,sortBy:{column:'name',order:'asc'}})});
       if(!res.ok)throw new Error(`HTTP ${res.status}`);const files=await res.json();
       allFiles=allFiles.concat(files.filter(f=>f.name&&f.metadata));if(files.length<1000)break;offset+=1000;
     }
@@ -214,7 +214,7 @@ async function refreshStorage() {
     });
     if(expiredFiles.length>0){
       const names=expiredFiles.map(f=>f.name);
-      const delRes=await fetch(`${sbUrl}/storage/v1/object/${sbBucket}`,{method:'DELETE',headers:{'Authorization':`Bearer ${sbKey}`,'Content-Type':'application/json'},body:JSON.stringify({prefixes:names})});
+      const delRes=await fetch(`${sbUrl}/storage/v1/object/${sbBucket}`,{method:'DELETE',headers:{'Authorization':`Bearer ${sbKey}`,'apikey':sbKey,'Content-Type':'application/json'},body:JSON.stringify({prefixes:names})});
       if(delRes.ok){deletedCount=names.length;allFiles=allFiles.filter(f=>!names.includes(f.name));}
     }
 
@@ -335,7 +335,7 @@ async function uploadAll(){
       setPb(item.id,25);
       if(doCompress){try{setSt(item.id,'processing','圧縮中...');const r=await compressTextures(buf,texMaxSize,texQuality);buf=r.buffer;if(r.compressed>0)addLog(`  テクスチャ ${r.compressed} 枚圧縮 (-${(r.saved/1024/1024).toFixed(1)}MB → ${(buf.byteLength/1024/1024).toFixed(1)}MB)`,'ok');else addLog('  圧縮対象のテクスチャなし','info');}catch(e){addLog(`  テクスチャ圧縮エラー: ${e.message}`,'err');}}
       setPb(item.id,60);
-      const res=await fetch(`${sbUrl}/storage/v1/object/${sbBucket}/${encodeURIComponent(item.newName)}`,{method:'POST',headers:{'Authorization':`Bearer ${sbKey}`,'Content-Type':'model/gltf-binary','x-upsert':'true'},body:new Blob([buf],{type:'model/gltf-binary'})});
+      const res=await fetch(`${sbUrl}/storage/v1/object/${sbBucket}/${encodeURIComponent(item.newName)}`,{method:'POST',headers:{'Authorization':`Bearer ${sbKey}`,'apikey':sbKey,'Content-Type':'model/gltf-binary','x-upsert':'true'},body:new Blob([buf],{type:'model/gltf-binary'})});
       setPb(item.id,90);if(!res.ok)throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       const glbUrl=`${sbUrl}/storage/v1/object/public/${sbBucket}/${encodeURIComponent(item.newName)}`;
       const viewerUrl=`${viewerBase}?glb=${encodeURIComponent(glbUrl)}&uploaded=${today}`;
