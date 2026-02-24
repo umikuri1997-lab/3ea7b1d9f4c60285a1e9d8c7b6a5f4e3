@@ -40,6 +40,7 @@
   .file-orig{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
   .file-new{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .file-size{font-size:10px;color:var(--muted);margin-top:3px;}
+  .file-warn{font-size:10px;color:var(--warn);margin-top:3px;}
   .file-status{font-size:11px;padding:3px 8px;border-radius:4px;flex-shrink:0;align-self:flex-start;margin-top:2px;}
   .file-status.pending{background:rgba(255,255,255,0.05);color:var(--muted);}
   .file-status.processing{background:rgba(79,195,247,0.15);color:var(--accent);}
@@ -102,6 +103,7 @@
   .storage-info{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted);}
   .storage-files{font-size:11px;color:var(--muted);margin-top:4px;}
   .storage-deleted{font-size:11px;color:var(--warn);margin-top:6px;}
+  .storage-warn{font-size:11px;color:var(--warn);margin-top:6px;padding:6px 10px;background:rgba(255,167,38,0.08);border:1px solid rgba(255,167,38,0.2);border-radius:6px;}
 </style>
 </head>
 <body>
@@ -149,6 +151,7 @@
       <div class="storage-info"><span id="storage-used">0 MB</span><span id="storage-limit">/ 1 GB</span></div>
       <div class="storage-files" id="storage-files"></div>
       <div class="storage-deleted" id="storage-deleted" style="display:none"></div>
+      <div class="storage-warn" id="storage-size-warn" style="display:none">⚠️ Supabaseのファイルサイズ上限がデフォルト(50MB)の可能性があります。大きいGLBをアップロードする場合は Storage → Settings から上限を引き上げてください。</div>
     </div>
   </div>
   <div class="card">
@@ -173,12 +176,16 @@
 <script>
 function openDrawer(){document.getElementById('settings-drawer').classList.add('open');document.getElementById('drawer-overlay').classList.add('open');}
 function closeDrawer(){document.getElementById('settings-drawer').classList.remove('open');document.getElementById('drawer-overlay').classList.remove('open');}
+
+// ===== URL TRIM HELPER =====
+function trimUrl(url) { return (url || '').trim().replace(/\/+$/, ''); }
+
 function saveConfig(){
-  const u=document.getElementById('supabase-url').value.trim(),k=document.getElementById('supabase-key').value.trim();
+  const u=trimUrl(document.getElementById('supabase-url').value),k=document.getElementById('supabase-key').value.trim();
   if(!u||!k){alert('URLとキーを入力してください');return;}
   localStorage.setItem('sb_url',u);localStorage.setItem('sb_key',k);
   localStorage.setItem('sb_bucket',document.getElementById('supabase-bucket').value.trim()||'glb-models');
-  localStorage.setItem('viewer_url',document.getElementById('viewer-url').value.trim());
+  localStorage.setItem('viewer_url',trimUrl(document.getElementById('viewer-url').value));
   const m=document.getElementById('config-saved');m.style.display='block';setTimeout(()=>m.style.display='none',2000);
   refreshStorage();
 }
@@ -192,12 +199,25 @@ function loadConfig(){
 // ===== STORAGE & AUTO-DELETE =====
 const SUPABASE_FREE_LIMIT = 1 * 1024 * 1024 * 1024;
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+let bucketFileSizeLimit = 0; // バケットのファイルサイズ上限を記録
 
 async function refreshStorage() {
-  const sbUrl=localStorage.getItem('sb_url'),sbKey=localStorage.getItem('sb_key'),sbBucket=localStorage.getItem('sb_bucket')||'glb-models';
+  const sbUrl=trimUrl(localStorage.getItem('sb_url')),sbKey=localStorage.getItem('sb_key')?.trim(),sbBucket=localStorage.getItem('sb_bucket')||'glb-models';
   if(!sbUrl||!sbKey){document.getElementById('storage-loading').textContent='設定を保存すると表示されます';document.getElementById('storage-loading').style.display='block';document.getElementById('storage-detail').style.display='none';return;}
   document.getElementById('storage-loading').textContent='取得中...';document.getElementById('storage-loading').style.display='block';document.getElementById('storage-detail').style.display='none';
   try{
+    // バケット情報取得（ファイルサイズ上限チェック）
+    try {
+      const bucketRes = await fetch(`${sbUrl}/storage/v1/bucket/${sbBucket}`, { headers: { 'Authorization': `Bearer ${sbKey}`, 'apikey': sbKey } });
+      if (bucketRes.ok) {
+        const bucketInfo = await bucketRes.json();
+        bucketFileSizeLimit = bucketInfo.file_size_limit || 0;
+        const warnEl = document.getElementById('storage-size-warn');
+        if (bucketFileSizeLimit > 0 && bucketFileSizeLimit <= 52428800) { warnEl.style.display = 'block'; }
+        else { warnEl.style.display = 'none'; }
+      }
+    } catch(e) {}
+
     let allFiles=[],offset=0;
     while(true){
       const res=await fetch(`${sbUrl}/storage/v1/object/list/${sbBucket}`,{method:'POST',headers:{'Authorization':`Bearer ${sbKey}`,'apikey':sbKey,'Content-Type':'application/json'},body:JSON.stringify({prefix:'',limit:1000,offset,sortBy:{column:'name',order:'asc'}})});
@@ -205,12 +225,12 @@ async function refreshStorage() {
       allFiles=allFiles.concat(files.filter(f=>f.name&&f.metadata));if(files.length<1000)break;offset+=1000;
     }
 
-    // 1年経過ファイルの自動削除
+    // 1年経過ファイルの自動削除（updated_at を使用）
     const now=Date.now();let deletedCount=0;
     const expiredFiles=allFiles.filter(f=>{
-      const created=f.created_at||f.metadata?.lastModified;
-      if(!created)return false;
-      return (now-new Date(created).getTime()) > ONE_YEAR_MS;
+      const ts = f.updated_at || f.created_at || f.metadata?.lastModified;
+      if(!ts)return false;
+      return (now - new Date(ts).getTime()) > ONE_YEAR_MS;
     });
     if(expiredFiles.length>0){
       const names=expiredFiles.map(f=>f.name);
@@ -228,7 +248,7 @@ async function refreshStorage() {
     const delEl=document.getElementById('storage-deleted');
     if(deletedCount>0){delEl.textContent=`🗑 ${deletedCount} 件の期限切れファイルを自動削除しました`;delEl.style.display='block';}
     else{delEl.style.display='none';}
-  }catch(e){document.getElementById('storage-loading').textContent='取得エラー: '+e.message;}
+  }catch(e){document.getElementById('storage-loading').textContent='取得エラー: '+e.message;document.getElementById('storage-loading').style.display='block';}
 }
 
 function toSafe(name){
@@ -303,29 +323,39 @@ async function compressTextures(buf,maxSize,quality){
   return{buffer:ob,saved:totalSaved,compressed};
 }
 
+// ===== QR CODE (ローカル生成フォールバック付き) =====
+function generateQRUrl(text) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${encodeURIComponent(text)}&margin=1`;
+}
+function createFallbackQR(container, url) {
+  container.innerHTML = `<div style="width:128px;height:128px;background:#fff;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:8px;text-align:center;"><div style="font-size:24px;margin-bottom:4px;">📱</div><div style="font-size:8px;color:#333;word-break:break-all;line-height:1.3;max-height:80px;overflow:hidden;">${url.substring(0,100)}...</div></div>`;
+}
+
 let queue=[];
 function addFiles(files){const doRename=document.getElementById('opt-rename').checked;Array.from(files).forEach(f=>{if(!f.name.toLowerCase().endsWith('.glb')){addLog(`スキップ: ${f.name}`,'err');return;}queue.push({file:f,newName:doRename?toSafe(f.name):f.name,status:'pending',id:Math.random().toString(36).slice(2)});});renderQueue();}
 function renderQueue(){
   const qc=document.getElementById('queue-card'),qf=document.getElementById('file-queue'),us=document.getElementById('upload-section');
   if(!queue.length){qc.style.display='none';us.style.display='none';return;}
   qc.style.display='block';us.classList.add('visible');qf.innerHTML='';
-  queue.forEach((item,i)=>{const changed=item.newName!==item.file.name;const d=document.createElement('div');d.className='file-item';d.id='fi-'+item.id;
-    d.innerHTML=`<div class="file-icon">📦</div><div class="file-info"><div class="file-orig">${esc(item.file.name)}</div><div class="file-new">${esc(item.newName)}${changed?` <span style="color:var(--warn);font-size:10px">✦変換</span>`:''}</div><div class="file-size">${(item.file.size/1024/1024).toFixed(1)} MB</div><div class="progress-wrap" id="pw-${item.id}"><div class="progress-bar" id="pb-${item.id}"></div></div><div class="result-section" id="rs-${item.id}"></div></div><span class="file-status pending" id="st-${item.id}">待機中</span>${item.status==='pending'?`<button class="file-remove" onclick="removeFile(${i})">✕</button>`:''}`;
+  queue.forEach((item,i)=>{const changed=item.newName!==item.file.name;const sizeMB=item.file.size/1024/1024;
+    const sizeWarn = (bucketFileSizeLimit > 0 && item.file.size > bucketFileSizeLimit) ? `<div class="file-warn">⚠️ バケット上限(${(bucketFileSizeLimit/1024/1024).toFixed(0)}MB)を超えています。圧縮で小さくならない場合は上限引き上げが必要です。</div>` : '';
+    const d=document.createElement('div');d.className='file-item';d.id='fi-'+item.id;
+    d.innerHTML=`<div class="file-icon">📦</div><div class="file-info"><div class="file-orig">${esc(item.file.name)}</div><div class="file-new">${esc(item.newName)}${changed?` <span style="color:var(--warn);font-size:10px">✦変換</span>`:''}</div><div class="file-size">${sizeMB.toFixed(1)} MB</div>${sizeWarn}<div class="progress-wrap" id="pw-${item.id}"><div class="progress-bar" id="pb-${item.id}"></div></div><div class="result-section" id="rs-${item.id}"></div></div><span class="file-status pending" id="st-${item.id}">待機中</span>${item.status==='pending'?`<button class="file-remove" onclick="removeFile(${i})">✕</button>`:''}`;
     qf.appendChild(d);});
 }
 function removeFile(i){queue.splice(i,1);renderQueue();}
 function clearQueue(){queue=queue.filter(f=>f.status!=='pending');if(queue.every(f=>f.status!=='pending'))queue=[];renderQueue();}
 
 async function uploadAll(){
-  const sbUrl=localStorage.getItem('sb_url'),sbKey=localStorage.getItem('sb_key'),sbBucket=localStorage.getItem('sb_bucket')||'glb-models';
-  const viewerBase=(localStorage.getItem('viewer_url')||'').replace(/\/?$/,'/');
+  const sbUrl=trimUrl(localStorage.getItem('sb_url')),sbKey=localStorage.getItem('sb_key')?.trim(),sbBucket=localStorage.getItem('sb_bucket')||'glb-models';
+  const viewerBase=trimUrl(localStorage.getItem('viewer_url'));
   if(!sbUrl||!sbKey){alert('右上の⚙️から設定を保存してください');return;}
   if(!viewerBase){alert('⚙️からビューアーURLを設定してください');return;}
   const btn=document.getElementById('btn-upload');btn.disabled=true;btn.textContent='アップロード中...';
   document.getElementById('log-area').classList.add('visible');
   const doLights=document.getElementById('opt-lights').checked,doCompress=document.getElementById('opt-compress').checked;
   const texMaxSize=parseInt(document.getElementById('opt-tex-size').value),texQuality=parseFloat(document.getElementById('opt-tex-quality').value);
-  const today=new Date().toISOString().slice(0,10); // YYYY-MM-DD
+  const today=new Date().toISOString().slice(0,10);
   for(const item of queue){
     if(item.status!=='pending')continue;
     setSt(item.id,'processing','処理中...');showPw(item.id,true);setPb(item.id,5);addLog(`処理中: ${item.file.name} → ${item.newName}`,'info');
@@ -335,10 +365,23 @@ async function uploadAll(){
       setPb(item.id,25);
       if(doCompress){try{setSt(item.id,'processing','圧縮中...');const r=await compressTextures(buf,texMaxSize,texQuality);buf=r.buffer;if(r.compressed>0)addLog(`  テクスチャ ${r.compressed} 枚圧縮 (-${(r.saved/1024/1024).toFixed(1)}MB → ${(buf.byteLength/1024/1024).toFixed(1)}MB)`,'ok');else addLog('  圧縮対象のテクスチャなし','info');}catch(e){addLog(`  テクスチャ圧縮エラー: ${e.message}`,'err');}}
       setPb(item.id,60);
+
+      // ファイルサイズチェック
+      if (bucketFileSizeLimit > 0 && buf.byteLength > bucketFileSizeLimit) {
+        throw new Error(`ファイルサイズ(${(buf.byteLength/1024/1024).toFixed(1)}MB)がバケット上限(${(bucketFileSizeLimit/1024/1024).toFixed(0)}MB)を超えています。Supabase Storage設定で上限を引き上げてください。`);
+      }
+
+      setSt(item.id,'processing','アップロード中...');
       const res=await fetch(`${sbUrl}/storage/v1/object/${sbBucket}/${encodeURIComponent(item.newName)}`,{method:'POST',headers:{'Authorization':`Bearer ${sbKey}`,'apikey':sbKey,'Content-Type':'model/gltf-binary','x-upsert':'true'},body:new Blob([buf],{type:'model/gltf-binary'})});
-      setPb(item.id,90);if(!res.ok)throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+      setPb(item.id,90);
+      if(!res.ok){
+        const errText = await res.text();
+        let errMsg = `HTTP ${res.status}`;
+        try { const ej = JSON.parse(errText); errMsg = ej.message || ej.error || errMsg; } catch(e) { errMsg += ': ' + errText.substring(0, 200); }
+        throw new Error(errMsg);
+      }
       const glbUrl=`${sbUrl}/storage/v1/object/public/${sbBucket}/${encodeURIComponent(item.newName)}`;
-      const viewerUrl=`${viewerBase}?glb=${encodeURIComponent(glbUrl)}&uploaded=${today}`;
+      const viewerUrl=`${viewerBase}/?g=${encodeURIComponent(glbUrl)}&u=${today}`;
       item.status='done';setPb(item.id,100);setSt(item.id,'done','完了 ✓');
       showResult(item.id,glbUrl,viewerUrl);addLog('  ✓ 完了','ok');
     }catch(e){item.status='error';setSt(item.id,'error','エラー');addLog(`  ✗ ${e.message}`,'err');}
@@ -348,14 +391,14 @@ async function uploadAll(){
 
 function showResult(id,glbUrl,viewerUrl){
   const sec=document.getElementById('rs-'+id);if(!sec)return;
-  const qrImgUrl=`https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${encodeURIComponent(viewerUrl)}&margin=1`;
+  const qrImgUrl=generateQRUrl(viewerUrl);
   sec.innerHTML=`
     <div class="result-label">GLB直接URL</div>
     <div class="url-row"><div class="url-text" id="gu-${id}">${esc(glbUrl)}</div><button class="copy-btn" id="cgb-${id}" onclick="doCopy('gu-${id}','cgb-${id}')">コピー</button></div>
     <div class="result-label">🔗 ビューアーURL</div>
     <div class="url-row"><div class="url-text viewer" id="vu-${id}">${esc(viewerUrl)}</div><button class="copy-btn" id="cvb-${id}" onclick="doCopy('vu-${id}','cvb-${id}')">コピー</button><button class="open-btn" onclick="window.open('${esc(viewerUrl)}','_blank')">開く ↗</button></div>
     <div class="qr-wrap">
-      <img src="${qrImgUrl}" width="128" height="128" style="flex-shrink:0;border-radius:4px;background:#fff;" onerror="this.style.display='none'">
+      <div id="qr-container-${id}"><img src="${qrImgUrl}" width="128" height="128" style="flex-shrink:0;border-radius:4px;background:#fff;" onerror="createFallbackQR(this.parentElement,'${esc(viewerUrl)}')"></div>
       <div class="qr-info"><div class="qr-title">📱 QRコード</div><div class="qr-hint">スマートフォンでスキャンすると<br>ウォークスルーが開きます</div></div>
     </div>`;
   sec.classList.add('visible');
@@ -366,7 +409,7 @@ function showPw(id,v){const e=document.getElementById('pw-'+id);if(e)e.classList
 function setPb(id,p){const e=document.getElementById('pb-'+id);if(e)e.style.width=p+'%';}
 function doCopy(tid,bid){const t=document.getElementById(tid)?.textContent||'',b=document.getElementById(bid);navigator.clipboard.writeText(t).then(()=>{if(b){b.textContent='✓ コピー済み';b.classList.add('copied');setTimeout(()=>{b.textContent='コピー';b.classList.remove('copied');},2000);}});}
 function addLog(msg,type='info'){const e=document.getElementById('log-content'),d=document.createElement('div');d.className='log-'+type;d.textContent=msg;e.appendChild(d);e.scrollTop=e.scrollHeight;}
-function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
 const dz=document.getElementById('drop-zone'),fi=document.getElementById('file-input');
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
