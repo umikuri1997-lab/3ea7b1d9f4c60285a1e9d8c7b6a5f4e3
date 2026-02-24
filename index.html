@@ -252,7 +252,7 @@ if (isMobile && (document.documentElement.requestFullscreen || document.document
 // ===== RENDERER =====
 const container = document.getElementById('canvas-container');
 const renderer = new THREE.WebGLRenderer({ antialias: !isMobile });
-renderer.setPixelRatio(isMobile ? 1.0 : Math.min(window.devicePixelRatio, 1.5));
+renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.5) : Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = !isMobile;
 if (!isMobile) renderer.shadowMap.type = THREE.PCFSoftShadowMap;
