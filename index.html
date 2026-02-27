@@ -81,8 +81,25 @@
   .loading-info-title { font-family:'DM Mono',monospace; font-size:10px; font-weight:700; letter-spacing:0.1em; color:var(--accent); margin-bottom:8px; }
   .loading-info-row { font-family:'DM Mono',monospace; font-size:11px; color:var(--muted); line-height:1.8; }
   .loading-info-row b { color:var(--text); font-weight:500; }
-  .loading-disclaimer { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); text-align:center; line-height:1.6; margin-top:4px; opacity:0.7; }
+  .loading-disclaimer { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); text-align:center; line-height:1.6; margin-top:4px; }
   .loading-expiry { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); text-align:center; margin-top:2px; }
+
+  /* PC/スマホ出し分け */
+  .info-mobile { display:none; }
+  .info-desktop { display:block; }
+  body.is-mobile .info-mobile { display:block; }
+  body.is-mobile .info-desktop { display:none; }
+
+  /* 横画面スマホ: コンパクト化 */
+  @media (max-height: 420px) {
+    #loading-overlay { gap:8px; padding:10px 20px; }
+    .loading-spinner { width:24px; height:24px; }
+    .loading-info-box { padding:8px 12px; margin-bottom:6px; }
+    .loading-info-title { font-size:9px; margin-bottom:4px; }
+    .loading-info-row { font-size:10px; line-height:1.5; }
+    .loading-disclaimer, .loading-expiry { font-size:9px; margin-top:2px; }
+    .loading-slow { font-size:10px; }
+  }
 
   /* In-scene UI */
   #lock-msg { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(10,10,11,0.85); border:1px solid var(--border); padding:8px 16px; font-family:'DM Mono',monospace; font-size:11px; color:var(--muted); pointer-events:none; white-space:nowrap; display:none; }
@@ -116,10 +133,10 @@
   <div class="loading-info" id="loading-info">
     <div class="loading-info-box">
       <div class="loading-info-title">🎮 操作方法</div>
-      <div class="loading-info-row"><b>📱 スマートフォン</b><br>画面左半分をドラッグ → 移動<br>画面右半分をドラッグ → 視点操作<br>右下の ⛶ ボタン → 全画面表示</div>
-      <div class="loading-info-row" style="margin-top:8px;"><b>💻 パソコン</b><br>画面クリック → 歩行モード開始<br>W A S D キー → 移動<br>マウス → 視点操作 ／ Esc → 解除</div>
+      <div class="loading-info-row info-mobile">画面左半分をドラッグ → 移動<br>画面右半分をドラッグ → 視点操作<br>右下の ⛶ ボタン → 全画面表示</div>
+      <div class="loading-info-row info-desktop">画面クリック → 歩行モード開始<br>W A S D キー → 移動<br>マウス → 視点操作 ／ Esc → 解除</div>
     </div>
-    <div class="loading-disclaimer">※3Dソフトの表現上、実際の施工・仕上がりとは<br>異なる箇所がございます。</div>
+    <div class="loading-disclaimer">※3Dソフトの表現上、実際の施工・仕上がりとは異なる箇所がございます。</div>
     <div class="loading-expiry" id="loading-expiry"></div>
   </div>
 </div>
