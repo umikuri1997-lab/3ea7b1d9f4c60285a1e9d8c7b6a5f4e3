@@ -651,42 +651,49 @@ async function compressTextures(buf, maxSize, quality) {
 
   if (!replacements.length) return { buffer: buf, saved: 0, compressed: 0 };
 
-  // バイナリを再構築（bufferView のオフセットを更新）
+  // バイナリを再構築（bufferView のオフセットを4バイト境界で更新）
   const replaceMap = new Map();
   replacements.forEach(r => replaceMap.set(r.bvIndex, r));
 
   const bvEntries = bufferViews.map((bv, idx) => ({ idx, offset: bv.byteOffset || 0, length: bv.byteLength }));
   bvEntries.sort((a, b) => a.offset - b.offset);
 
+  /** 4バイト境界にパディング */
+  function align4(data) {
+    const pad = (4 - data.length % 4) % 4;
+    if (pad === 0) return data;
+    const padded = new Uint8Array(data.length + pad);
+    padded.set(data);
+    return padded;
+  }
+
   const newParts = [];
   let cursor = 0;
 
   for (const entry of bvEntries) {
-    // ギャップを埋める
-    if (entry.offset > cursor) newParts.push(binData.slice(cursor, entry.offset));
+    // ギャップを埋める（4バイト境界にアライン）
+    if (entry.offset > cursor) newParts.push(align4(binData.slice(cursor, entry.offset)));
 
     const newOffset = newParts.reduce((s, p) => s + p.length, 0);
     const replacement = replaceMap.get(entry.idx);
 
     if (replacement) {
-      let data = replacement.data;
-      // 4バイト境界パディング
-      const pad = (4 - data.length % 4) % 4;
-      if (pad > 0) { const padded = new Uint8Array(data.length + pad); padded.set(data); data = padded; }
-      newParts.push(data);
+      newParts.push(align4(replacement.data));
       bufferViews[entry.idx].byteOffset = newOffset;
       bufferViews[entry.idx].byteLength = replacement.data.length;
     } else {
-      newParts.push(binData.slice(entry.offset, entry.offset + entry.length));
+      newParts.push(align4(binData.slice(entry.offset, entry.offset + entry.length)));
       bufferViews[entry.idx].byteOffset = newOffset;
     }
     cursor = entry.offset + entry.length;
   }
 
-  if (cursor < binLen) newParts.push(binData.slice(cursor));
+  if (cursor < binLen) newParts.push(align4(binData.slice(cursor)));
 
-  // 新バイナリ結合
-  const newBinLen = newParts.reduce((s, p) => s + p.length, 0);
+  // 新バイナリ結合（全体も4バイト境界）
+  let newBinLen = newParts.reduce((s, p) => s + p.length, 0);
+  const binPad = (4 - newBinLen % 4) % 4;
+  newBinLen += binPad;
   const newBin = new Uint8Array(newBinLen);
   let pos = 0;
   for (const p of newParts) { newBin.set(p, pos); pos += p.length; }
