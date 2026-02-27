@@ -221,7 +221,30 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script>
+<script type="importmap">
+{"imports":{"@gltf-transform/core":"https://esm.sh/@gltf-transform/core@4","@gltf-transform/functions":"https://esm.sh/@gltf-transform/functions@4"}}
+</script>
+<script type="module">
+/* ============================================================
+   gltf-transform (非同期読み込み、失敗時はフォールバック)
+   ============================================================ */
+let gltfReady = false;
+let WebIO, gt_dedup, gt_prune, gt_weld;
+
+const gltfLoadPromise = Promise.all([
+  import('@gltf-transform/core'),
+  import('@gltf-transform/functions')
+]).then(([core, functions]) => {
+  WebIO = core.WebIO;
+  gt_dedup = functions.dedup;
+  gt_prune = functions.prune;
+  gt_weld = functions.weld;
+  gltfReady = true;
+  console.log('gltf-transform loaded');
+}).catch(e => {
+  console.warn('gltf-transform unavailable, using manual fallback:', e);
+});
+
 /* ============================================================
    Utility
    ============================================================ */
@@ -488,6 +511,42 @@ async function removeLights(buf) {
   }
 
   return { buffer: out, count };
+}
+
+/* ============================================================
+   GLB Processing: gltf-transform 最適化
+   dedup(重複除去) + prune(未使用削除) + weld(頂点結合) + ライト削除
+   ============================================================ */
+
+async function gltfOptimize(buf, doRemoveLights) {
+  const io = new WebIO();
+  const doc = await io.readBinary(new Uint8Array(buf));
+
+  // ライト拡張の削除
+  let lightRemoved = false;
+  if (doRemoveLights) {
+    for (const ext of doc.getRoot().listExtensionsUsed()) {
+      if (ext.extensionName === 'KHR_lights_punctual') {
+        ext.dispose();
+        lightRemoved = true;
+      }
+    }
+  }
+
+  // メッシュ最適化
+  await doc.transform(
+    gt_dedup(),
+    gt_prune(),
+    gt_weld({ tolerance: 0.0001 })
+  );
+
+  const glbBytes = await io.writeBinary(doc);
+
+  // Uint8Array → ArrayBuffer (compressTexturesとの互換)
+  const resultBuf = new ArrayBuffer(glbBytes.byteLength);
+  new Uint8Array(resultBuf).set(glbBytes);
+
+  return { buffer: resultBuf, lightRemoved };
 }
 
 /* ============================================================
@@ -798,19 +857,51 @@ async function uploadAll() {
 
     try {
       let buf = await item.file.arrayBuffer();
-      setPb(item.id, 15);
+      const origSize = buf.byteLength;
+      setPb(item.id, 10);
 
-      // ライト削除
-      if (doLights) {
+      // gltf-transform ロード待ち（まだ読み込み中の場合）
+      if (!gltfReady) await gltfLoadPromise;
+
+      // gltf-transform が使える場合: ライト削除 + dedup/prune/weld
+      if (gltfReady) {
         try {
-          const r = await removeLights(buf);
+          setSt(item.id, 'processing', '最適化中...');
+          const r = await gltfOptimize(buf, doLights);
+          const saved = origSize - r.buffer.byteLength;
           buf = r.buffer;
-          addLog('  ライト ' + r.count + ' 個削除', r.count > 0 ? 'ok' : 'info');
+          if (r.lightRemoved) addLog('  ライト拡張を削除', 'ok');
+          if (saved > 0) {
+            addLog('  dedup/prune/weld: -' + (saved / 1024 / 1024).toFixed(1) + 'MB (' + (buf.byteLength / 1024 / 1024).toFixed(1) + 'MB)', 'ok');
+          } else {
+            addLog('  dedup/prune/weld: 削減対象なし', 'info');
+          }
         } catch (e) {
-          addLog('  ライト削除エラー: ' + e.message, 'err');
+          addLog('  gltf-transform エラー、手動処理にフォールバック: ' + e.message, 'err');
+          // フォールバック: 手動ライト削除
+          if (doLights) {
+            try {
+              const r = await removeLights(buf);
+              buf = r.buffer;
+              addLog('  ライト ' + r.count + ' 個削除（フォールバック）', r.count > 0 ? 'ok' : 'info');
+            } catch (e2) {
+              addLog('  ライト削除エラー: ' + e2.message, 'err');
+            }
+          }
+        }
+      } else {
+        // gltf-transform 未ロード: 手動ライト削除のみ
+        if (doLights) {
+          try {
+            const r = await removeLights(buf);
+            buf = r.buffer;
+            addLog('  ライト ' + r.count + ' 個削除', r.count > 0 ? 'ok' : 'info');
+          } catch (e) {
+            addLog('  ライト削除エラー: ' + e.message, 'err');
+          }
         }
       }
-      setPb(item.id, 25);
+      setPb(item.id, 35);
 
       // テクスチャ圧縮
       if (doCompress) {
@@ -949,6 +1040,18 @@ function addLog(msg, type) {
   container.appendChild(line);
   container.scrollTop = container.scrollHeight;
 }
+
+/* ============================================================
+   Global exports (module scope → HTML onclick handlers)
+   ============================================================ */
+window.openDrawer = openDrawer;
+window.closeDrawer = closeDrawer;
+window.saveConfig = saveConfig;
+window.refreshStorage = refreshStorage;
+window.removeFile = removeFile;
+window.clearQueue = clearQueue;
+window.uploadAll = uploadAll;
+window.doCopy = doCopy;
 
 /* ============================================================
    Init
