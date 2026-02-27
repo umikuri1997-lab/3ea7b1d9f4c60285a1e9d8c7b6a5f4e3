@@ -155,10 +155,9 @@
   <div class="drawer-header"><h2>設定</h2><button class="icon-btn" onclick="closeDrawer()">✕</button></div>
   <div class="drawer-section">
     <div class="section-title">⚙️ Supabase（初回のみ）</div>
-    <div class="field"><label>Project URL</label><input type="text" id="supabase-url" placeholder="https://xxxxxxxxxxxx.supabase.co" /></div>
-    <div class="field"><label>API Key（anon key 推奨）</label><input type="password" id="supabase-key" placeholder="eyJhbGciOiJIUzI1NiIs..." /></div>
+    <div class="field"><label>Project URL</label><input type="text" id="supabase-url" placeholder="https://xxxx.supabase.co" /></div>
+    <div class="field"><label>API Key</label><input type="password" id="supabase-key" placeholder="sb_publishable_xxxx... または eyJhbG..." /></div>
     <div class="field"><label>バケット名</label><input type="text" id="supabase-bucket" value="glb-models" /></div>
-    <div class="field"><label>ビューアーURL（QRに使用）</label><input type="text" id="viewer-url" placeholder="https://user.github.io/repo/" /></div>
     <button class="drawer-btn" onclick="saveConfig()">設定を保存</button>
     <div class="config-saved" id="config-saved">✓ 保存しました</div>
   </div>
@@ -221,6 +220,7 @@
   <div id="log-area"><div class="card-title" style="margin-bottom:8px">📝 ログ</div><div id="log-content"></div></div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 /* ============================================================
    Utility
@@ -259,7 +259,6 @@ function saveConfig() {
   localStorage.setItem('sb_url', u);
   localStorage.setItem('sb_key', k);
   localStorage.setItem('sb_bucket', document.getElementById('supabase-bucket').value.trim() || 'glb-models');
-  localStorage.setItem('viewer_url', trimUrl(document.getElementById('viewer-url').value));
 
   const msg = document.getElementById('config-saved');
   msg.style.display = 'block';
@@ -271,7 +270,6 @@ function loadConfig() {
   document.getElementById('supabase-url').value = localStorage.getItem('sb_url') || '';
   document.getElementById('supabase-key').value = localStorage.getItem('sb_key') || '';
   document.getElementById('supabase-bucket').value = localStorage.getItem('sb_bucket') || 'glb-models';
-  document.getElementById('viewer-url').value = localStorage.getItem('viewer_url') || '';
 }
 
 /* ============================================================
@@ -659,27 +657,38 @@ async function compressTextures(buf, maxSize, quality) {
 }
 
 /* ============================================================
-   QR Code (外部API + フォールバック)
+   QR Code (ローカル生成: qrcode.js)
    ============================================================ */
 
-function generateQRUrl(text) {
-  return 'https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=' + encodeURIComponent(text) + '&margin=1';
-}
-
-/** QR API失敗時のフォールバック表示（XSS safe: textContent使用） */
-function createFallbackQR(container, url) {
+/** QRコードをcanvasで生成してcontainerに追加 */
+function generateQR(container, text) {
   container.innerHTML = '';
-  const box = document.createElement('div');
-  box.style.cssText = 'width:128px;height:128px;background:#fff;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:8px;text-align:center;';
-  const icon = document.createElement('div');
-  icon.style.cssText = 'font-size:24px;margin-bottom:4px;';
-  icon.textContent = '📱';
-  const text = document.createElement('div');
-  text.style.cssText = 'font-size:8px;color:#333;word-break:break-all;line-height:1.3;max-height:80px;overflow:hidden;';
-  text.textContent = url.substring(0, 100) + '...'; // textContent = XSS safe
-  box.appendChild(icon);
-  box.appendChild(text);
-  container.appendChild(box);
+  try {
+    new QRCode(container, {
+      text: text,
+      width: 128,
+      height: 128,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+    // QRCode.jsが生成するimg/canvasにスタイル適用
+    const el = container.querySelector('img, canvas');
+    if (el) { el.style.borderRadius = '4px'; el.style.display = 'block'; }
+  } catch (e) {
+    // フォールバック: URLテキスト表示
+    const box = document.createElement('div');
+    box.style.cssText = 'width:128px;height:128px;background:#fff;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:8px;text-align:center;';
+    const icon = document.createElement('div');
+    icon.style.cssText = 'font-size:24px;margin-bottom:4px;';
+    icon.textContent = '📱';
+    const txt = document.createElement('div');
+    txt.style.cssText = 'font-size:8px;color:#333;word-break:break-all;line-height:1.3;max-height:80px;overflow:hidden;';
+    txt.textContent = text.substring(0, 100) + '...';
+    box.appendChild(icon);
+    box.appendChild(txt);
+    container.appendChild(box);
+  }
 }
 
 /* ============================================================
@@ -763,10 +772,10 @@ async function uploadAll() {
   const sbUrl = trimUrl(localStorage.getItem('sb_url'));
   const sbKey = localStorage.getItem('sb_key')?.trim();
   const sbBucket = localStorage.getItem('sb_bucket') || 'glb-models';
-  const viewerBase = trimUrl(localStorage.getItem('viewer_url'));
+  // ビューアーURL: upload.htmlと同じディレクトリのindex.htmlを自動算出
+  const viewerBase = trimUrl(window.location.href.replace(/\/[^\/]*$/, ''));
 
   if (!sbUrl || !sbKey) { alert('右上の⚙️から設定を保存してください'); return; }
-  if (!viewerBase) { alert('⚙️からビューアーURLを設定してください'); return; }
 
   const btn = document.getElementById('btn-upload');
   btn.disabled = true;
@@ -878,7 +887,6 @@ function showResult(id, glbUrl, viewerUrl) {
   const sec = document.getElementById('rs-' + id);
   if (!sec) return;
 
-  const qrImgUrl = generateQRUrl(viewerUrl);
   const escapedViewer = esc(viewerUrl);
   const escapedGlb = esc(glbUrl);
 
@@ -891,11 +899,12 @@ function showResult(id, glbUrl, viewerUrl) {
     '<button class="copy-btn" id="cvb-' + id + '" onclick="doCopy(\'vu-' + id + '\',\'cvb-' + id + '\')">コピー</button>' +
     '<button class="open-btn" onclick="window.open(\'' + escapedViewer + '\',\'_blank\')">開く ↗</button></div>' +
     '<div class="qr-wrap">' +
-    '<div id="qr-container-' + id + '"><img src="' + qrImgUrl + '" width="128" height="128" ' +
-    'style="flex-shrink:0;border-radius:4px;background:#fff;" ' +
-    'onerror="createFallbackQR(this.parentElement,\'' + escapedViewer + '\')"></div>' +
+    '<div id="qr-container-' + id + '"></div>' +
     '<div class="qr-info"><div class="qr-title">📱 QRコード</div>' +
     '<div class="qr-hint">スマートフォンでスキャンすると<br>ウォークスルーが開きます</div></div></div>';
+
+  // ローカルQR生成
+  generateQR(document.getElementById('qr-container-' + id), viewerUrl);
 
   sec.classList.add('visible');
 }
