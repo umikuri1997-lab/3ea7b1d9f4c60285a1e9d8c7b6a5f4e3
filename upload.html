@@ -521,91 +521,35 @@ async function removeLights(buf) {
 async function gltfOptimize(buf, doRemoveLights) {
   const io = new WebIO();
 
-  // GLBを手動パースして4バイトアライン済みで再構築
+  // GLBを手動パースしてJSON + BINに分離（readBinaryのアラインメント問題を回避）
   const src = new DataView(buf);
   if (src.getUint32(0, true) !== 0x46546C67) throw new Error('Not GLB');
-  const ver = src.getUint32(4, true);
 
-  let off = 12, jsonBytes = null, binBytes = null;
+  let off = 12, jsonChunk = null, binChunk = null;
   while (off < buf.byteLength) {
     const cLen = src.getUint32(off, true);
     const cType = src.getUint32(off + 4, true);
-    if (cType === 0x4E4F534A) jsonBytes = new Uint8Array(buf, off + 8, cLen);
-    else if (cType === 0x004E4942) binBytes = new Uint8Array(buf, off + 8, cLen);
+    if (cType === 0x4E4F534A) {
+      jsonChunk = new TextDecoder().decode(new Uint8Array(buf, off + 8, cLen));
+    } else if (cType === 0x004E4942) {
+      // BINデータを新しいArrayBufferにコピー（アラインメント保証）
+      const bin = new Uint8Array(cLen);
+      bin.set(new Uint8Array(buf, off + 8, cLen));
+      binChunk = bin.buffer;
+    }
     off += 8 + cLen;
   }
-  if (!jsonBytes) throw new Error('No JSON chunk');
+  if (!jsonChunk) throw new Error('No JSON chunk');
 
-  // JSONを解析してbufferViewオフセットを4バイトアラインに修正
-  const gltf = JSON.parse(new TextDecoder().decode(jsonBytes));
-  const bvs = gltf.bufferViews || [];
-
-  if (binBytes && bvs.length > 0) {
-    // オフセット順にソート（インデックス保持）
-    const sorted = bvs.map((bv, i) => ({ i, off: bv.byteOffset || 0, len: bv.byteLength }));
-    sorted.sort((a, b) => a.off - b.off);
-
-    const parts = [];
-    let cursor = 0;
-    for (const s of sorted) {
-      // ギャップ（パディング済みで追加）
-      if (s.off > cursor) {
-        const gap = s.off - cursor;
-        const gapPad = (4 - gap % 4) % 4;
-        parts.push(new Uint8Array(gap + gapPad));
-        new Uint8Array(gap + gapPad).set(binBytes.slice(cursor, s.off));
-        parts[parts.length - 1] = new Uint8Array(gap + gapPad);
-        parts[parts.length - 1].set(binBytes.slice(cursor, s.off));
-      }
-      const newOff = parts.reduce((sum, p) => sum + p.length, 0);
-      // データ + パディング
-      const dataPad = (4 - s.len % 4) % 4;
-      const chunk = new Uint8Array(s.len + dataPad);
-      chunk.set(binBytes.slice(s.off, s.off + s.len));
-      parts.push(chunk);
-      bvs[s.i].byteOffset = newOff;
-      cursor = s.off + s.len;
-    }
-    if (cursor < binBytes.length) {
-      const rest = binBytes.length - cursor;
-      const restPad = (4 - rest % 4) % 4;
-      const chunk = new Uint8Array(rest + restPad);
-      chunk.set(binBytes.slice(cursor));
-      parts.push(chunk);
-    }
-
-    // 新BIN結合
-    const newBinLen = parts.reduce((s, p) => s + p.length, 0);
-    const newBin = new Uint8Array(newBinLen);
-    let pos = 0;
-    for (const p of parts) { newBin.set(p, pos); pos += p.length; }
-
-    if (gltf.buffers && gltf.buffers[0]) gltf.buffers[0].byteLength = newBinLen;
-
-    // アライン済みGLB再構築
-    let jsonStr = JSON.stringify(gltf);
-    while (jsonStr.length % 4) jsonStr += ' ';
-    const jb = new TextEncoder().encode(jsonStr);
-
-    const total = 12 + 8 + jb.length + 8 + newBinLen;
-    const cleanBuf = new ArrayBuffer(total);
-    const dv = new DataView(cleanBuf);
-    const arr = new Uint8Array(cleanBuf);
-
-    dv.setUint32(0, 0x46546C67, true);
-    dv.setUint32(4, ver, true);
-    dv.setUint32(8, total, true);
-    dv.setUint32(12, jb.length, true);
-    dv.setUint32(16, 0x4E4F534A, true);
-    arr.set(jb, 20);
-    dv.setUint32(20 + jb.length, newBinLen, true);
-    dv.setUint32(24 + jb.length, 0x004E4942, true);
-    arr.set(newBin, 28 + jb.length);
-
-    buf = cleanBuf;
+  const gltf = JSON.parse(jsonChunk);
+  const resources = {};
+  if (binChunk && gltf.buffers && gltf.buffers[0]) {
+    // glTF bufferのURIキー（GLBでは空文字列 or undefined）
+    const uri = gltf.buffers[0].uri || '';
+    resources[uri] = binChunk;
   }
 
-  const doc = await io.readBinary(new Uint8Array(buf));
+  const doc = await io.readJSON({ json: gltf, resources });
 
   // ライト拡張の削除
   let lightRemoved = false;
