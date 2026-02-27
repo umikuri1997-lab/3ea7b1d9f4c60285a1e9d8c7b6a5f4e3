@@ -520,7 +520,10 @@ async function removeLights(buf) {
 
 async function gltfOptimize(buf, doRemoveLights) {
   const io = new WebIO();
-  const doc = await io.readBinary(new Uint8Array(buf));
+  // 4バイトアラインメント保証: 新しいArrayBufferにコピー
+  const aligned = new Uint8Array(buf.byteLength);
+  aligned.set(new Uint8Array(buf));
+  const doc = await io.readBinary(aligned);
 
   // ライト拡張の削除
   let lightRemoved = false;
