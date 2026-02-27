@@ -185,7 +185,7 @@
   <div id="fps-badge"></div>
   <button id="btn-fullscreen" onclick="toggleFullscreen()">⛶</button>
   <button id="btn-measure" onclick="toggleMeasure()" title="計測">📏</button>
-  <div id="measure-hint">計測: モデルの2点をクリック</div>
+  <div id="measure-hint">計測: 壁・床・天井をクリック → 対面までの距離</div>
 </div>
 
 <script type="importmap">
@@ -812,10 +812,10 @@ window.addEventListener('resize', () => {
 
 /* ── Measurement tool ── */
 let measureMode = false;
-let measurePoints = [];       // THREE.Vector3[]
 let measureMarkers = [];      // THREE.Mesh[]
 let measureLine = null;       // THREE.Line
 let measureLabelEl = null;    // HTMLElement
+let measurePoints = [];       // THREE.Vector3[2]
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
@@ -835,11 +835,29 @@ function clearMeasure() {
   if (measureLabelEl) { measureLabelEl.remove(); measureLabelEl = null; }
 }
 
-function addMeasurePoint(point) {
-  if (measurePoints.length >= 2) clearMeasure();
-  measurePoints.push(point.clone());
+/** 法線をワールド空間に変換し、最も近い軸(±X,±Y,±Z)にスナップ */
+function snapNormalToAxis(faceNormal, object) {
+  const worldNormal = faceNormal.clone()
+    .transformDirection(object.matrixWorld);
 
-  // マーカー球
+  // 各成分の絶対値で最大軸を見つける
+  const ax = Math.abs(worldNormal.x);
+  const ay = Math.abs(worldNormal.y);
+  const az = Math.abs(worldNormal.z);
+
+  if (ay >= ax && ay >= az) {
+    // Y軸が最大 → 垂直（天井↔床）
+    return new THREE.Vector3(0, Math.sign(worldNormal.y), 0);
+  } else if (ax >= az) {
+    // X軸が最大 → 水平X方向
+    return new THREE.Vector3(Math.sign(worldNormal.x), 0, 0);
+  } else {
+    // Z軸が最大 → 水平Z方向
+    return new THREE.Vector3(0, 0, Math.sign(worldNormal.z));
+  }
+}
+
+function addMarker(point) {
   const geo = new THREE.SphereGeometry(0.03, 12, 12);
   const mat = new THREE.MeshBasicMaterial({ color: 0xc8ff00, depthTest: false, transparent: true, opacity: 0.9 });
   const marker = new THREE.Mesh(geo, mat);
@@ -847,20 +865,65 @@ function addMeasurePoint(point) {
   marker.position.copy(point);
   scene.add(marker);
   measureMarkers.push(marker);
+}
 
-  // 2点揃ったらライン＋距離表示
-  if (measurePoints.length === 2) {
-    const lineGeo = new THREE.BufferGeometry().setFromPoints(measurePoints);
-    const lineMat = new THREE.LineBasicMaterial({ color: 0xc8ff00, depthTest: false, transparent: true, opacity: 0.8 });
-    measureLine = new THREE.Line(lineGeo, lineMat);
-    measureLine.renderOrder = 999;
-    scene.add(measureLine);
+function showMeasureLine(p1, p2) {
+  const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+  const lineMat = new THREE.LineBasicMaterial({ color: 0xc8ff00, depthTest: false, transparent: true, opacity: 0.8 });
+  measureLine = new THREE.Line(lineGeo, lineMat);
+  measureLine.renderOrder = 999;
+  scene.add(measureLine);
 
-    const dist = measurePoints[0].distanceTo(measurePoints[1]);
-    measureLabelEl = document.createElement('div');
-    measureLabelEl.className = 'measure-label';
-    measureLabelEl.textContent = dist >= 1 ? dist.toFixed(2) + ' m' : (dist * 100).toFixed(1) + ' cm';
-    document.getElementById('ui').appendChild(measureLabelEl);
+  const dist = p1.distanceTo(p2);
+  measureLabelEl = document.createElement('div');
+  measureLabelEl.className = 'measure-label';
+  measureLabelEl.textContent = dist >= 1 ? dist.toFixed(2) + ' m' : (dist * 100).toFixed(1) + ' cm';
+  document.getElementById('ui').appendChild(measureLabelEl);
+}
+
+function performMeasure(hit) {
+  clearMeasure();
+
+  const origin = hit.point.clone();
+  const normal = snapNormalToAxis(hit.face.normal, hit.object);
+
+  // 法線方向にレイを飛ばして対面を検出
+  const ray = new THREE.Raycaster(
+    origin.clone().add(normal.clone().multiplyScalar(0.005)), // 少しオフセット
+    normal,
+    0,
+    100 // 最大100m
+  );
+  const hits = ray.intersectObject(loadedModel, true);
+
+  if (hits.length > 0) {
+    // 対面ヒット → 2点間を表示
+    const target = hits[0].point;
+    measurePoints = [origin, target];
+    addMarker(origin);
+    addMarker(target);
+    showMeasureLine(origin, target);
+  } else {
+    // 対面なし → 逆方向を試す
+    const reverseNormal = normal.clone().negate();
+    const ray2 = new THREE.Raycaster(
+      origin.clone().add(reverseNormal.clone().multiplyScalar(0.005)),
+      reverseNormal,
+      0,
+      100
+    );
+    const hits2 = ray2.intersectObject(loadedModel, true);
+    if (hits2.length > 0) {
+      const target = hits2[0].point;
+      measurePoints = [origin, target];
+      addMarker(origin);
+      addMarker(target);
+      showMeasureLine(origin, target);
+    } else {
+      // どちらも当たらない → マーカーだけ表示
+      addMarker(origin);
+      measurePoints = [origin];
+    }
   }
 }
 
@@ -876,7 +939,7 @@ function updateMeasureLabels() {
   measureLabelEl.style.display = (mid.z > 0 && mid.z < 1) ? 'block' : 'none';
 }
 
-/** 計測モード中のクリック → Raycast */
+/** 計測モード中のクリック → Raycast → 法線方向計測 */
 renderer.domElement.addEventListener('pointerdown', (e) => {
   if (!measureMode || !loadedModel) return;
   e.preventDefault();
@@ -884,7 +947,7 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, activeCamera);
   const hits = raycaster.intersectObject(loadedModel, true);
-  if (hits.length > 0) addMeasurePoint(hits[0].point);
+  if (hits.length > 0 && hits[0].face) performMeasure(hits[0]);
 });
 
 /* ── Animation loop ── */
