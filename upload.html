@@ -222,7 +222,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="importmap">
-{"imports":{"@gltf-transform/core":"https://esm.sh/@gltf-transform/core@4","@gltf-transform/functions":"https://esm.sh/@gltf-transform/functions@4"}}
+{"imports":{"@gltf-transform/core":"https://cdn.jsdelivr.net/npm/@gltf-transform/core@4/+esm","@gltf-transform/functions":"https://cdn.jsdelivr.net/npm/@gltf-transform/functions@4/+esm"}}
 </script>
 <script type="module">
 /* ============================================================
@@ -521,59 +521,40 @@ async function removeLights(buf) {
 async function gltfOptimize(buf, doRemoveLights) {
   const io = new WebIO();
 
-  // GLBを手動パースしてJSON + BINに分離（readBinaryのアラインメント問題を回避）
-  const src = new DataView(buf);
-  if (src.getUint32(0, true) !== 0x46546C67) throw new Error('Not GLB');
+  // Blob→fetch→arrayBufferで完全にクリーンなバッファを取得
+  const blob = new Blob([new Uint8Array(buf)], { type: 'model/gltf-binary' });
+  const url = URL.createObjectURL(blob);
+  try {
+    const resp = await fetch(url);
+    const cleanBuf = await resp.arrayBuffer();
+    const doc = await io.readBinary(new Uint8Array(cleanBuf));
 
-  let off = 12, jsonChunk = null, binChunk = null;
-  while (off < buf.byteLength) {
-    const cLen = src.getUint32(off, true);
-    const cType = src.getUint32(off + 4, true);
-    if (cType === 0x4E4F534A) {
-      jsonChunk = new TextDecoder().decode(new Uint8Array(buf, off + 8, cLen));
-    } else if (cType === 0x004E4942) {
-      // BINデータを新しいArrayBufferにコピー（アラインメント保証）
-      const bin = new Uint8Array(cLen);
-      bin.set(new Uint8Array(buf, off + 8, cLen));
-      binChunk = bin.buffer;
-    }
-    off += 8 + cLen;
-  }
-  if (!jsonChunk) throw new Error('No JSON chunk');
-
-  const gltf = JSON.parse(jsonChunk);
-  const resources = {};
-  if (binChunk && gltf.buffers && gltf.buffers[0]) {
-    const BUFFER_KEY = 'buffer0.bin';
-    gltf.buffers[0].uri = BUFFER_KEY;
-    resources[BUFFER_KEY] = new Uint8Array(binChunk);
-  }
-
-  const doc = await io.readJSON({ json: gltf, resources });
-
-  // ライト拡張の削除
-  let lightRemoved = false;
-  if (doRemoveLights) {
-    for (const ext of doc.getRoot().listExtensionsUsed()) {
-      if (ext.extensionName === 'KHR_lights_punctual') {
-        ext.dispose();
-        lightRemoved = true;
+    // ライト拡張の削除
+    let lightRemoved = false;
+    if (doRemoveLights) {
+      for (const ext of doc.getRoot().listExtensionsUsed()) {
+        if (ext.extensionName === 'KHR_lights_punctual') {
+          ext.dispose();
+          lightRemoved = true;
+        }
       }
     }
+
+    // メッシュ最適化
+    await doc.transform(
+      gt_dedup(),
+      gt_prune(),
+      gt_weld({ tolerance: 0.0001 })
+    );
+
+    const glbBytes = await io.writeBinary(doc);
+    const resultBuf = new ArrayBuffer(glbBytes.byteLength);
+    new Uint8Array(resultBuf).set(glbBytes);
+
+    return { buffer: resultBuf, lightRemoved };
+  } finally {
+    URL.revokeObjectURL(url);
   }
-
-  // メッシュ最適化
-  await doc.transform(
-    gt_dedup(),
-    gt_prune(),
-    gt_weld({ tolerance: 0.0001 })
-  );
-
-  const glbBytes = await io.writeBinary(doc);
-  const resultBuf = new ArrayBuffer(glbBytes.byteLength);
-  new Uint8Array(resultBuf).set(glbBytes);
-
-  return { buffer: resultBuf, lightRemoved };
 }
 
 /* ============================================================
