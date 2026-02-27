@@ -577,21 +577,45 @@ async function compressTextures(buf, maxSize, quality) {
 
   const binData = new Uint8Array(buf, binOff, binLen);
   const bufferViews = gltf.bufferViews || [];
-  const replacements = []; // { bvIndex, data, origLen }
-  let totalSaved = 0;
-  let compressed = 0;
 
-  // 各画像を処理
+  // 同一 bufferView を複数 images が参照している場合があるため、bufferView単位で一度だけ変換する
+  const bvToImageIdx = new Map(); // bvIndex -> [imageIdx...]
   for (let i = 0; i < gltf.images.length; i++) {
     const img = gltf.images[i];
     if (img.bufferView === undefined) continue;
-    const bv = bufferViews[img.bufferView];
-    if (!bv) continue;
+    if (!bvToImageIdx.has(img.bufferView)) bvToImageIdx.set(img.bufferView, []);
+    bvToImageIdx.get(img.bufferView).push(i);
+  }
 
+  function sniffMime(bytes, fallback) {
+    if (bytes.length >= 12) {
+      // PNG: 89 50 4E 47 0D 0A 1A 0A
+      if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) return 'image/png';
+      // JPEG: FF D8 FF
+      if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) return 'image/jpeg';
+      // WEBP: RIFF....WEBP
+      if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+          bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return 'image/webp';
+    }
+    return fallback || 'image/png';
+  }
+
+  const replacements = []; // { bvIndex, data, paddedData, origLen }
+  let totalSaved = 0;
+  let compressed = 0;
+
+  for (const [bvIndex, imgIndices] of bvToImageIdx.entries()) {
+    const bv = bufferViews[bvIndex];
+    if (!bv) continue;
     const imgOff = bv.byteOffset || 0;
     const imgLen = bv.byteLength;
     const origBytes = binData.slice(imgOff, imgOff + imgLen);
-    const blob = new Blob([origBytes], { type: img.mimeType || 'image/png' });
+
+    const firstImg = gltf.images[imgIndices[0]];
+    const hintMime = firstImg?.mimeType || 'image/png';
+    const mime = sniffMime(origBytes, hintMime);
+
+    const blob = new Blob([origBytes], { type: mime });
     const url = URL.createObjectURL(blob);
 
     try {
@@ -601,14 +625,16 @@ async function compressTextures(buf, maxSize, quality) {
           let w = el.width, h = el.height;
 
           // 既にサイズ内のJPEGはスキップ
-          if (w <= maxSize && h <= maxSize && img.mimeType === 'image/jpeg') {
-            resolve(null); return;
+          if (w <= maxSize && h <= maxSize && mime === 'image/jpeg') {
+            resolve(null);
+            return;
           }
 
           // リサイズ
           if (w > maxSize || h > maxSize) {
             const s = maxSize / Math.max(w, h);
-            w = Math.round(w * s); h = Math.round(h * s);
+            w = Math.round(w * s);
+            h = Math.round(h * s);
           }
 
           const c = document.createElement('canvas');
@@ -633,16 +659,28 @@ async function compressTextures(buf, maxSize, quality) {
         el.onerror = () => reject(new Error('画像ロード失敗'));
         el.src = url;
       });
+
       URL.revokeObjectURL(url);
 
       if (result && result.data.length < imgLen) {
-        replacements.push({ bvIndex: img.bufferView, data: result.data, origLen: imgLen });
+        // 4バイト境界パディング（GLB BINチャンク内の配置用）
+        let padded = result.data;
+        const pad = (4 - padded.length % 4) % 4;
+        if (pad > 0) {
+          const p = new Uint8Array(padded.length + pad);
+          p.set(padded);
+          padded = p;
+        }
+
+        replacements.push({ bvIndex, data: result.data, paddedData: padded, origLen: imgLen });
         totalSaved += imgLen - result.data.length;
-        img.mimeType = result.mime;
+        // 同じbufferViewを参照する全imagesにmimeTypeを反映
+        imgIndices.forEach(ii => { gltf.images[ii].mimeType = result.mime; });
         compressed++;
       }
     } catch (e) {
       URL.revokeObjectURL(url);
+      // 変換失敗はスキップ
     }
   }
 
@@ -657,7 +695,6 @@ async function compressTextures(buf, maxSize, quality) {
 
   const newParts = [];
   let cursor = 0;
-
   for (const entry of bvEntries) {
     // ギャップを埋める
     if (entry.offset > cursor) newParts.push(binData.slice(cursor, entry.offset));
@@ -666,20 +703,16 @@ async function compressTextures(buf, maxSize, quality) {
     const replacement = replaceMap.get(entry.idx);
 
     if (replacement) {
-      let data = replacement.data;
-      // 4バイト境界パディング
-      const pad = (4 - data.length % 4) % 4;
-      if (pad > 0) { const padded = new Uint8Array(data.length + pad); padded.set(data); data = padded; }
-      newParts.push(data);
+      newParts.push(replacement.paddedData);
       bufferViews[entry.idx].byteOffset = newOffset;
       bufferViews[entry.idx].byteLength = replacement.data.length;
     } else {
       newParts.push(binData.slice(entry.offset, entry.offset + entry.length));
       bufferViews[entry.idx].byteOffset = newOffset;
     }
+
     cursor = entry.offset + entry.length;
   }
-
   if (cursor < binLen) newParts.push(binData.slice(cursor));
 
   // 新バイナリ結合
@@ -695,7 +728,11 @@ async function compressTextures(buf, maxSize, quality) {
   while (jsonStr.length % 4) jsonStr += ' ';
   const jsonBytes = new TextEncoder().encode(jsonStr);
 
-  const total = 12 + 8 + jsonBytes.length + 8 + newBinLen;
+  // BINチャンク長も4バイト境界に揃える
+  const binPad = (4 - newBinLen % 4) % 4;
+  const finalBinLen = newBinLen + binPad;
+  const total = 12 + 8 + jsonBytes.length + 8 + finalBinLen;
+
   const out = new ArrayBuffer(total);
   const outView = new DataView(out);
   const outArr = new Uint8Array(out);
@@ -703,14 +740,19 @@ async function compressTextures(buf, maxSize, quality) {
   outView.setUint32(0, 0x46546C67, true);
   outView.setUint32(4, version, true);
   outView.setUint32(8, total, true);
+
+  // JSON
   outView.setUint32(12, jsonBytes.length, true);
   outView.setUint32(16, 0x4E4F534A, true);
   outArr.set(jsonBytes, 20);
 
+  // BIN
   const bs = 20 + jsonBytes.length;
-  outView.setUint32(bs, newBinLen, true);
+  outView.setUint32(bs, finalBinLen, true);
   outView.setUint32(bs + 4, 0x004E4942, true);
   outArr.set(newBin, bs + 8);
+  // BIN padding
+  for (let k = 0; k < binPad; k++) outArr[bs + 8 + newBinLen + k] = 0;
 
   return { buffer: out, saved: totalSaved, compressed };
 }
