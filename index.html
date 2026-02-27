@@ -291,14 +291,14 @@ async function buildHDRPanel() {
   const ct = document.getElementById('hdr-presets');
   ct.innerHTML = '<div style="padding:8px 12px;font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted)">読み込み中...</div>';
   try {
-    const pp = window.location.pathname.split('/').filter(Boolean);
-    const res = await fetch('https://api.github.com/repos/' + window.location.hostname.split('.')[0] + '/' + (pp[0]||'') + '/contents/hdr');
-    if (!res.ok) throw new Error('HDR folder not found');
-    const files = await res.json();
-    HDR_PRESETS = files.filter(f => f.name.toLowerCase().endsWith('.hdr')).map(f => ({ file: f.name }));
+    // hdr/files.json からファイル一覧を取得（GitHub API不要）
+    const res = await fetch('./hdr/files.json');
+    if (!res.ok) throw new Error('files.json not found');
+    const files = await res.json(); // ["file1.hdr", "file2.hdr"]
+    HDR_PRESETS = files.filter(f => f.toLowerCase().endsWith('.hdr')).map(f => ({ file: f }));
     if (!HDR_PRESETS.length) throw new Error('No HDR files');
   } catch (e) {
-    ct.innerHTML = '<div style="padding:8px 12px;font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted)">hdr/ フォルダにHDRファイルを追加してください</div>';
+    ct.innerHTML = '<div style="padding:8px 12px;font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted)">hdr/files.json を作成してください<br><span style="font-size:9px;opacity:0.6">例: ["room.hdr", "outdoor.hdr"]</span></div>';
     return;
   }
   ct.innerHTML = '';
