@@ -7,111 +7,149 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230a0a0b'/><path d='M6 22 L11 10 L16 18 L19 13 L26 22Z' fill='%23c8ff00' opacity='0.9'/><circle cx='22' cy='10' r='3' fill='%23c8ff00' opacity='0.6'/></svg>">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap');
-  :root{--bg:#0d0d10;--surface:#15151a;--surface2:#1c1c24;--border:rgba(255,255,255,0.07);--accent:#4fc3f7;--accent-dim:rgba(79,195,247,0.12);--success:#66bb6a;--success-dim:rgba(102,187,106,0.12);--warn:#ffa726;--danger:#ef5350;--text:#e8eaed;--muted:#9aa0a6;--font:'Noto Sans JP',sans-serif;--mono:'JetBrains Mono',monospace;--r:10px;}
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:0 0 60px;}
-  #header{width:100%;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:14px 20px;gap:12px;position:sticky;top:0;z-index:100;}
-  #header .title{font-size:16px;font-weight:500;letter-spacing:1px;flex:1;}
-  #header .title span{color:var(--accent);}
-  .icon-btn{width:36px;height:36px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all 0.2s;flex-shrink:0;}
-  .icon-btn:hover{color:var(--text);border-color:rgba(255,255,255,0.2);}
-  #drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:none;backdrop-filter:blur(4px);}
-  #drawer-overlay.open{display:block;}
-  #settings-drawer{position:fixed;top:0;right:0;height:100vh;width:340px;max-width:90vw;background:var(--surface);border-left:1px solid var(--border);z-index:300;transform:translateX(100%);transition:transform 0.3s cubic-bezier(0.16,1,0.3,1);display:flex;flex-direction:column;overflow-y:auto;}
-  #settings-drawer.open{transform:translateX(0);}
-  .drawer-header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border);}
-  .drawer-header h2{font-size:14px;font-weight:500;letter-spacing:1px;}
-  .drawer-section{padding:20px;}
-  .drawer-section+.drawer-section{border-top:1px solid var(--border);}
-  .section-title{font-size:10px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
-  #main{width:100%;max-width:560px;padding:24px 20px;}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px;}
-  .card-title{font-size:11px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
-  #drop-zone{border:2px dashed rgba(255,255,255,0.1);border-radius:var(--r);padding:52px 24px;text-align:center;cursor:pointer;transition:all 0.25s;}
-  #drop-zone:hover,#drop-zone.drag-over{border-color:var(--accent);background:var(--accent-dim);}
-  #drop-zone .drop-icon{font-size:44px;margin-bottom:14px;opacity:0.5;}
-  #drop-zone p{font-size:15px;color:var(--muted);margin-bottom:4px;}
-  #drop-zone .hint{font-size:11px;color:rgba(255,255,255,0.2);}
-  #file-input{display:none;}
-  #file-queue{display:flex;flex-direction:column;gap:8px;}
-  .file-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px;}
-  .file-icon{font-size:20px;flex-shrink:0;margin-top:2px;}
-  .file-info{flex:1;min-width:0;}
-  .file-orig{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
-  .file-new{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .file-size{font-size:10px;color:var(--muted);margin-top:3px;}
-  .file-warn{font-size:10px;color:var(--warn);margin-top:3px;}
-  .file-status{font-size:11px;padding:3px 8px;border-radius:4px;flex-shrink:0;align-self:flex-start;margin-top:2px;}
-  .file-status.pending{background:rgba(255,255,255,0.05);color:var(--muted);}
-  .file-status.processing{background:rgba(79,195,247,0.15);color:var(--accent);}
-  .file-status.done{background:var(--success-dim);color:var(--success);}
-  .file-status.error{background:rgba(239,83,80,0.15);color:var(--danger);}
-  .file-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px;align-self:flex-start;transition:color 0.2s;}
-  .file-remove:hover{color:var(--danger);}
-  .progress-wrap{height:3px;background:var(--border);border-radius:2px;margin-top:6px;overflow:hidden;display:none;}
-  .progress-wrap.visible{display:block;}
-  .progress-bar{height:100%;background:var(--accent);border-radius:2px;width:0%;transition:width 0.2s;}
-  .result-section{margin-top:10px;display:none;}
-  .result-section.visible{display:block;}
-  .result-label{font-size:10px;color:var(--muted);margin-bottom:4px;margin-top:8px;letter-spacing:0.5px;}
-  .url-row{display:flex;gap:6px;align-items:center;margin-bottom:2px;}
-  .url-text{flex:1;font-family:var(--mono);font-size:10px;color:var(--success);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--success-dim);padding:5px 8px;border-radius:5px;border:1px solid rgba(102,187,106,0.2);cursor:text;user-select:all;}
-  .url-text.viewer{color:var(--accent);background:var(--accent-dim);border-color:rgba(79,195,247,0.2);}
-  .copy-btn,.open-btn{padding:5px 10px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:11px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
-  .copy-btn:hover,.open-btn:hover{color:var(--text);border-color:rgba(255,255,255,0.2);}
-  .copy-btn.copied{color:var(--success);border-color:var(--success);}
-  .open-btn{color:var(--accent);border-color:rgba(79,195,247,0.3);}
-  .open-btn:hover{background:var(--accent-dim);color:var(--accent);border-color:var(--accent);}
-  .qr-wrap{display:flex;align-items:flex-start;gap:14px;margin-top:10px;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--border);}
-  .qr-info .qr-title{font-size:12px;color:var(--accent);margin-bottom:5px;font-weight:500;}
-  .qr-info .qr-hint{font-size:11px;color:var(--muted);line-height:1.7;}
-  #upload-section{display:none;}
-  #upload-section.visible{display:block;}
-  .btn-row{display:flex;gap:8px;}
-  .btn{width:100%;padding:11px;background:var(--accent);border:none;border-radius:7px;color:#000;font-size:13px;font-weight:500;font-family:var(--font);cursor:pointer;transition:opacity 0.2s;}
-  .btn:hover{opacity:0.85;}.btn:disabled{opacity:0.4;cursor:not-allowed;}
-  .btn.secondary{background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
-  .btn.secondary:hover{color:var(--text);border-color:rgba(255,255,255,0.2);}
-  .btn-row .btn{flex:1;}
-  #log-area{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;display:none;}
-  #log-area.visible{display:block;}
-  #log-content{font-family:var(--mono);font-size:11px;color:var(--muted);max-height:140px;overflow-y:auto;line-height:1.8;}
-  .log-ok{color:var(--success);}.log-err{color:var(--danger);}.log-info{color:var(--accent);}
-  .field{margin-bottom:12px;}
-  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
-  .field input{width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:border-color 0.2s;}
-  .field input:focus{border-color:var(--accent);}
-  .field input::placeholder{color:rgba(255,255,255,0.2);}
-  .drawer-btn{width:100%;padding:10px;background:var(--accent);border:none;border-radius:7px;color:#000;font-size:13px;font-weight:500;font-family:var(--font);cursor:pointer;transition:opacity 0.2s;margin-top:4px;}
-  .drawer-btn:hover{opacity:0.85;}
-  .config-saved{font-size:11px;color:var(--success);margin-top:8px;display:none;text-align:center;}
-  .option-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
-  .option-row:last-child{border-bottom:none;}
-  .toggle{position:relative;width:36px;height:20px;flex-shrink:0;}
-  .toggle input{opacity:0;width:0;height:0;}
-  .toggle-slider{position:absolute;inset:0;background:rgba(255,255,255,0.1);border-radius:20px;cursor:pointer;transition:background 0.2s;}
-  .toggle-slider::before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform 0.2s;}
-  .toggle input:checked+.toggle-slider{background:var(--accent);}
-  .toggle input:checked+.toggle-slider::before{transform:translateX(16px);}
-  .option-label{flex:1;font-size:13px;}
-  .option-desc{font-size:10px;color:var(--muted);}
-  .storage-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 20px;margin-bottom:16px;}
-  .storage-bar-wrap{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:10px 0 6px;}
-  .storage-bar{height:100%;background:var(--accent);border-radius:4px;transition:width 0.4s;width:0%;}
-  .storage-bar.warn{background:var(--warn);}
-  .storage-bar.danger{background:var(--danger);}
-  .storage-info{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted);}
-  .storage-files{font-size:11px;color:var(--muted);margin-top:4px;}
-  .storage-deleted{font-size:11px;color:var(--warn);margin-top:6px;}
-  .storage-warn{font-size:11px;color:var(--warn);margin-top:6px;padding:6px 10px;background:rgba(255,167,38,0.08);border:1px solid rgba(255,167,38,0.2);border-radius:6px;}
+
+  :root {
+    --bg: #0d0d10; --surface: #15151a; --surface2: #1c1c24;
+    --border: rgba(255,255,255,0.07); --accent: #4fc3f7; --accent-dim: rgba(79,195,247,0.12);
+    --success: #66bb6a; --success-dim: rgba(102,187,106,0.12);
+    --warn: #ffa726; --danger: #ef5350;
+    --text: #e8eaed; --muted: #9aa0a6;
+    --font: 'Noto Sans JP', sans-serif; --mono: 'JetBrains Mono', monospace; --r: 10px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 0 0 60px; }
+
+  /* ── Header ── */
+  #header { width: 100%; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 14px 20px; gap: 12px; position: sticky; top: 0; z-index: 100; }
+  #header .title { font-size: 16px; font-weight: 500; letter-spacing: 1px; flex: 1; }
+  #header .title span { color: var(--accent); }
+  .icon-btn { width: 36px; height: 36px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: all 0.2s; flex-shrink: 0; }
+  .icon-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+
+  /* ── Drawer ── */
+  #drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: none; backdrop-filter: blur(4px); }
+  #drawer-overlay.open { display: block; }
+  #settings-drawer { position: fixed; top: 0; right: 0; height: 100vh; width: 340px; max-width: 90vw; background: var(--surface); border-left: 1px solid var(--border); z-index: 300; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); display: flex; flex-direction: column; overflow-y: auto; }
+  #settings-drawer.open { transform: translateX(0); }
+  .drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+  .drawer-header h2 { font-size: 14px; font-weight: 500; letter-spacing: 1px; }
+  .drawer-section { padding: 20px; }
+  .drawer-section + .drawer-section { border-top: 1px solid var(--border); }
+  .section-title { font-size: 10px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+
+  /* ── Main ── */
+  #main { width: 100%; max-width: 560px; padding: 24px 20px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 20px; margin-bottom: 16px; }
+  .card-title { font-size: 11px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+
+  /* ── Drop zone ── */
+  #drop-zone { border: 2px dashed rgba(255,255,255,0.1); border-radius: var(--r); padding: 52px 24px; text-align: center; cursor: pointer; transition: all 0.25s; }
+  #drop-zone:hover, #drop-zone.drag-over { border-color: var(--accent); background: var(--accent-dim); }
+  #drop-zone .drop-icon { font-size: 44px; margin-bottom: 14px; opacity: 0.5; }
+  #drop-zone p { font-size: 15px; color: var(--muted); margin-bottom: 4px; }
+  #drop-zone .hint { font-size: 11px; color: rgba(255,255,255,0.2); }
+  #file-input { display: none; }
+
+  /* ── File queue ── */
+  #file-queue { display: flex; flex-direction: column; gap: 8px; }
+  .file-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; display: flex; align-items: flex-start; gap: 12px; }
+  .file-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+  .file-info { flex: 1; min-width: 0; }
+  .file-orig { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+  .file-new { font-family: var(--mono); font-size: 12px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-size { font-size: 10px; color: var(--muted); margin-top: 3px; }
+  .file-warn { font-size: 10px; color: var(--warn); margin-top: 3px; }
+  .file-status { font-size: 11px; padding: 3px 8px; border-radius: 4px; flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
+  .file-status.pending { background: rgba(255,255,255,0.05); color: var(--muted); }
+  .file-status.processing { background: rgba(79,195,247,0.15); color: var(--accent); }
+  .file-status.done { background: var(--success-dim); color: var(--success); }
+  .file-status.error { background: rgba(239,83,80,0.15); color: var(--danger); }
+  .file-remove { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 0 4px; align-self: flex-start; transition: color 0.2s; }
+  .file-remove:hover { color: var(--danger); }
+
+  /* ── Progress ── */
+  .progress-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 6px; overflow: hidden; display: none; }
+  .progress-wrap.visible { display: block; }
+  .progress-bar { height: 100%; background: var(--accent); border-radius: 2px; width: 0%; transition: width 0.2s; }
+
+  /* ── Result URLs ── */
+  .result-section { margin-top: 10px; display: none; }
+  .result-section.visible { display: block; }
+  .result-label { font-size: 10px; color: var(--muted); margin-bottom: 4px; margin-top: 8px; letter-spacing: 0.5px; }
+  .url-row { display: flex; gap: 6px; align-items: center; margin-bottom: 2px; }
+  .url-text { flex: 1; font-family: var(--mono); font-size: 10px; color: var(--success); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--success-dim); padding: 5px 8px; border-radius: 5px; border: 1px solid rgba(102,187,106,0.2); cursor: text; user-select: all; }
+  .url-text.viewer { color: var(--accent); background: var(--accent-dim); border-color: rgba(79,195,247,0.2); }
+  .copy-btn, .open-btn { padding: 5px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; color: var(--muted); font-size: 11px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+  .copy-btn:hover, .open-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+  .copy-btn.copied { color: var(--success); border-color: var(--success); }
+  .open-btn { color: var(--accent); border-color: rgba(79,195,247,0.3); }
+  .open-btn:hover { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+  .qr-wrap { display: flex; align-items: flex-start; gap: 14px; margin-top: 10px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border); }
+  .qr-info .qr-title { font-size: 12px; color: var(--accent); margin-bottom: 5px; font-weight: 500; }
+  .qr-info .qr-hint { font-size: 11px; color: var(--muted); line-height: 1.7; }
+
+  /* ── Buttons ── */
+  #upload-section { display: none; }
+  #upload-section.visible { display: block; }
+  .btn-row { display: flex; gap: 8px; }
+  .btn { width: 100%; padding: 11px; background: var(--accent); border: none; border-radius: 7px; color: #000; font-size: 13px; font-weight: 500; font-family: var(--font); cursor: pointer; transition: opacity 0.2s; }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.secondary { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .btn.secondary:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+  .btn-row .btn { flex: 1; }
+
+  /* ── Log ── */
+  #log-area { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; display: none; }
+  #log-area.visible { display: block; }
+  #log-content { font-family: var(--mono); font-size: 11px; color: var(--muted); max-height: 140px; overflow-y: auto; line-height: 1.8; }
+  .log-ok { color: var(--success); }
+  .log-err { color: var(--danger); }
+  .log-info { color: var(--accent); }
+
+  /* ── Form fields ── */
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .field input { width: 100%; padding: 9px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-family: var(--mono); font-size: 12px; outline: none; transition: border-color 0.2s; }
+  .field input:focus { border-color: var(--accent); }
+  .field input::placeholder { color: rgba(255,255,255,0.2); }
+  .drawer-btn { width: 100%; padding: 10px; background: var(--accent); border: none; border-radius: 7px; color: #000; font-size: 13px; font-weight: 500; font-family: var(--font); cursor: pointer; transition: opacity 0.2s; margin-top: 4px; }
+  .drawer-btn:hover { opacity: 0.85; }
+  .config-saved { font-size: 11px; color: var(--success); margin-top: 8px; display: none; text-align: center; }
+
+  /* ── Toggle options ── */
+  .option-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .option-row:last-child { border-bottom: none; }
+  .toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: rgba(255,255,255,0.1); border-radius: 20px; cursor: pointer; transition: background 0.2s; }
+  .toggle-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform 0.2s; }
+  .toggle input:checked + .toggle-slider { background: var(--accent); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+  .option-label { flex: 1; font-size: 13px; }
+  .option-desc { font-size: 10px; color: var(--muted); }
+
+  /* ── Storage card ── */
+  .storage-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 16px 20px; margin-bottom: 16px; }
+  .storage-bar-wrap { height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; margin: 10px 0 6px; }
+  .storage-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.4s; width: 0%; }
+  .storage-bar.warn { background: var(--warn); }
+  .storage-bar.danger { background: var(--danger); }
+  .storage-info { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .storage-files { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .storage-deleted { font-size: 11px; color: var(--warn); margin-top: 6px; }
+  .storage-warn { font-size: 11px; color: var(--warn); margin-top: 6px; padding: 6px 10px; background: rgba(255,167,38,0.08); border: 1px solid rgba(255,167,38,0.2); border-radius: 6px; }
 </style>
 </head>
 <body>
+
 <div id="header">
   <div class="title">GLB <span>Upload</span></div>
   <button class="icon-btn" onclick="refreshStorage()" title="容量更新">🔄</button>
   <button class="icon-btn" onclick="openDrawer()" title="設定">⚙️</button>
 </div>
+
 <div id="drawer-overlay" onclick="closeDrawer()"></div>
 <div id="settings-drawer">
   <div class="drawer-header"><h2>設定</h2><button class="icon-btn" onclick="closeDrawer()">✕</button></div>
@@ -132,11 +170,17 @@
     <div id="compress-options" style="padding:8px 0 0 46px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
         <label style="font-size:11px;color:var(--muted);width:80px;">最大サイズ</label>
-        <select id="opt-tex-size" style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;"><option value="4096">4096px</option><option value="2048">2048px</option><option value="1024" selected>1024px</option><option value="512">512px</option></select>
+        <select id="opt-tex-size" style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;">
+          <option value="4096">4096px</option><option value="2048">2048px</option>
+          <option value="1024" selected>1024px</option><option value="512">512px</option>
+        </select>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <label style="font-size:11px;color:var(--muted);width:80px;">JPEG品質</label>
-        <select id="opt-tex-quality" style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;"><option value="0.9">90%（高品質）</option><option value="0.75" selected>75%（バランス）</option><option value="0.6">60%（小サイズ）</option></select>
+        <select id="opt-tex-quality" style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;">
+          <option value="0.9">90%（高品質）</option><option value="0.75" selected>75%（バランス）</option>
+          <option value="0.6">60%（小サイズ）</option>
+        </select>
       </div>
     </div>
   </div>
@@ -154,6 +198,7 @@
       <div class="storage-warn" id="storage-size-warn" style="display:none">⚠️ Supabaseのファイルサイズ上限がデフォルト(50MB)の可能性があります。大きいGLBをアップロードする場合は Storage → Settings から上限を引き上げてください。</div>
     </div>
   </div>
+
   <div class="card">
     <div id="drop-zone" onclick="document.getElementById('file-input').click()">
       <div class="drop-icon">📦</div>
@@ -162,261 +207,754 @@
     </div>
     <input type="file" id="file-input" accept=".glb" multiple>
   </div>
+
   <div class="card" id="queue-card" style="display:none">
     <div class="card-title">📋 アップロードキュー</div>
     <div id="file-queue"></div>
   </div>
+
   <div id="upload-section"><div class="card"><div class="btn-row">
     <button class="btn secondary" onclick="clearQueue()">クリア</button>
     <button class="btn" id="btn-upload" onclick="uploadAll()">アップロード開始 →</button>
   </div></div></div>
+
   <div id="log-area"><div class="card-title" style="margin-bottom:8px">📝 ログ</div><div id="log-content"></div></div>
 </div>
 
 <script>
-function openDrawer(){document.getElementById('settings-drawer').classList.add('open');document.getElementById('drawer-overlay').classList.add('open');}
-function closeDrawer(){document.getElementById('settings-drawer').classList.remove('open');document.getElementById('drawer-overlay').classList.remove('open');}
+/* ============================================================
+   Utility
+   ============================================================ */
 
-// ===== URL TRIM HELPER =====
-function trimUrl(url) { return (url || '').trim().replace(/\/+$/, ''); }
+/** HTMLエスケープ */
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
-function saveConfig(){
-  const u=trimUrl(document.getElementById('supabase-url').value),k=document.getElementById('supabase-key').value.trim();
-  if(!u||!k){alert('URLとキーを入力してください');return;}
-  localStorage.setItem('sb_url',u);localStorage.setItem('sb_key',k);
-  localStorage.setItem('sb_bucket',document.getElementById('supabase-bucket').value.trim()||'glb-models');
-  localStorage.setItem('viewer_url',trimUrl(document.getElementById('viewer-url').value));
-  const m=document.getElementById('config-saved');m.style.display='block';setTimeout(()=>m.style.display='none',2000);
+/** URL末尾の / を除去 */
+function trimUrl(url) {
+  return (url || '').trim().replace(/\/+$/, '');
+}
+
+/* ============================================================
+   Settings drawer
+   ============================================================ */
+
+function openDrawer() {
+  document.getElementById('settings-drawer').classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('settings-drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('open');
+}
+
+function saveConfig() {
+  const u = trimUrl(document.getElementById('supabase-url').value);
+  const k = document.getElementById('supabase-key').value.trim();
+  if (!u || !k) { alert('URLとキーを入力してください'); return; }
+
+  localStorage.setItem('sb_url', u);
+  localStorage.setItem('sb_key', k);
+  localStorage.setItem('sb_bucket', document.getElementById('supabase-bucket').value.trim() || 'glb-models');
+  localStorage.setItem('viewer_url', trimUrl(document.getElementById('viewer-url').value));
+
+  const msg = document.getElementById('config-saved');
+  msg.style.display = 'block';
+  setTimeout(() => { msg.style.display = 'none'; }, 2000);
   refreshStorage();
 }
-function loadConfig(){
-  document.getElementById('supabase-url').value=localStorage.getItem('sb_url')||'';
-  document.getElementById('supabase-key').value=localStorage.getItem('sb_key')||'';
-  document.getElementById('supabase-bucket').value=localStorage.getItem('sb_bucket')||'glb-models';
-  document.getElementById('viewer-url').value=localStorage.getItem('viewer_url')||'';
+
+function loadConfig() {
+  document.getElementById('supabase-url').value = localStorage.getItem('sb_url') || '';
+  document.getElementById('supabase-key').value = localStorage.getItem('sb_key') || '';
+  document.getElementById('supabase-bucket').value = localStorage.getItem('sb_bucket') || 'glb-models';
+  document.getElementById('viewer-url').value = localStorage.getItem('viewer_url') || '';
 }
 
-// ===== STORAGE & AUTO-DELETE =====
-const SUPABASE_FREE_LIMIT = 1 * 1024 * 1024 * 1024;
+/* ============================================================
+   Storage management & auto-delete
+   ============================================================ */
+
+const SUPABASE_FREE_LIMIT = 1 * 1024 * 1024 * 1024; // 1GB
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
-let bucketFileSizeLimit = 0; // バケットのファイルサイズ上限を記録
+let bucketFileSizeLimit = 0;
+
+/** Supabase APIヘッダー */
+function sbHeaders(key, contentType) {
+  const h = { 'Authorization': 'Bearer ' + key, 'apikey': key };
+  if (contentType) h['Content-Type'] = contentType;
+  return h;
+}
 
 async function refreshStorage() {
-  const sbUrl=trimUrl(localStorage.getItem('sb_url')),sbKey=localStorage.getItem('sb_key')?.trim(),sbBucket=localStorage.getItem('sb_bucket')||'glb-models';
-  if(!sbUrl||!sbKey){document.getElementById('storage-loading').textContent='設定を保存すると表示されます';document.getElementById('storage-loading').style.display='block';document.getElementById('storage-detail').style.display='none';return;}
-  document.getElementById('storage-loading').textContent='取得中...';document.getElementById('storage-loading').style.display='block';document.getElementById('storage-detail').style.display='none';
-  try{
+  const sbUrl = trimUrl(localStorage.getItem('sb_url'));
+  const sbKey = localStorage.getItem('sb_key')?.trim();
+  const sbBucket = localStorage.getItem('sb_bucket') || 'glb-models';
+
+  if (!sbUrl || !sbKey) {
+    document.getElementById('storage-loading').textContent = '設定を保存すると表示されます';
+    document.getElementById('storage-loading').style.display = 'block';
+    document.getElementById('storage-detail').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('storage-loading').textContent = '取得中...';
+  document.getElementById('storage-loading').style.display = 'block';
+  document.getElementById('storage-detail').style.display = 'none';
+
+  try {
     // バケット情報取得（ファイルサイズ上限チェック）
     try {
-      const bucketRes = await fetch(`${sbUrl}/storage/v1/bucket/${sbBucket}`, { headers: { 'Authorization': `Bearer ${sbKey}`, 'apikey': sbKey } });
+      const bucketRes = await fetch(sbUrl + '/storage/v1/bucket/' + sbBucket, { headers: sbHeaders(sbKey) });
       if (bucketRes.ok) {
-        const bucketInfo = await bucketRes.json();
-        bucketFileSizeLimit = bucketInfo.file_size_limit || 0;
-        const warnEl = document.getElementById('storage-size-warn');
-        if (bucketFileSizeLimit > 0 && bucketFileSizeLimit <= 52428800) { warnEl.style.display = 'block'; }
-        else { warnEl.style.display = 'none'; }
+        const info = await bucketRes.json();
+        bucketFileSizeLimit = info.file_size_limit || 0;
+        document.getElementById('storage-size-warn').style.display =
+          (bucketFileSizeLimit > 0 && bucketFileSizeLimit <= 52428800) ? 'block' : 'none';
       }
-    } catch(e) {}
+    } catch (e) { /* bucket info is optional */ }
 
-    let allFiles=[],offset=0;
-    while(true){
-      const res=await fetch(`${sbUrl}/storage/v1/object/list/${sbBucket}`,{method:'POST',headers:{'Authorization':`Bearer ${sbKey}`,'apikey':sbKey,'Content-Type':'application/json'},body:JSON.stringify({prefix:'',limit:1000,offset,sortBy:{column:'name',order:'asc'}})});
-      if(!res.ok)throw new Error(`HTTP ${res.status}`);const files=await res.json();
-      allFiles=allFiles.concat(files.filter(f=>f.name&&f.metadata));if(files.length<1000)break;offset+=1000;
+    // ファイル一覧取得（ページネーション対応）
+    let allFiles = [];
+    let offset = 0;
+    while (true) {
+      const res = await fetch(sbUrl + '/storage/v1/object/list/' + sbBucket, {
+        method: 'POST',
+        headers: sbHeaders(sbKey, 'application/json'),
+        body: JSON.stringify({ prefix: '', limit: 1000, offset, sortBy: { column: 'name', order: 'asc' } })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const files = await res.json();
+      allFiles = allFiles.concat(files.filter(f => f.name && f.metadata));
+      if (files.length < 1000) break;
+      offset += 1000;
     }
 
-    // 1年経過ファイルの自動削除（updated_at を使用）
-    const now=Date.now();let deletedCount=0;
-    const expiredFiles=allFiles.filter(f=>{
+    // 1年経過ファイルの自動削除（updated_at 優先）
+    const now = Date.now();
+    let deletedCount = 0;
+    const expiredFiles = allFiles.filter(f => {
       const ts = f.updated_at || f.created_at || f.metadata?.lastModified;
-      if(!ts)return false;
+      if (!ts) return false;
       return (now - new Date(ts).getTime()) > ONE_YEAR_MS;
     });
-    if(expiredFiles.length>0){
-      const names=expiredFiles.map(f=>f.name);
-      const delRes=await fetch(`${sbUrl}/storage/v1/object/${sbBucket}`,{method:'DELETE',headers:{'Authorization':`Bearer ${sbKey}`,'apikey':sbKey,'Content-Type':'application/json'},body:JSON.stringify({prefixes:names})});
-      if(delRes.ok){deletedCount=names.length;allFiles=allFiles.filter(f=>!names.includes(f.name));}
+
+    if (expiredFiles.length > 0) {
+      const names = expiredFiles.map(f => f.name);
+      const delRes = await fetch(sbUrl + '/storage/v1/object/' + sbBucket, {
+        method: 'DELETE',
+        headers: sbHeaders(sbKey, 'application/json'),
+        body: JSON.stringify({ prefixes: names })
+      });
+      if (delRes.ok) {
+        deletedCount = names.length;
+        allFiles = allFiles.filter(f => !names.includes(f.name));
+      }
     }
 
-    const totalBytes=allFiles.reduce((s,f)=>s+(f.metadata?.size||0),0);
-    const pct=Math.min((totalBytes/SUPABASE_FREE_LIMIT)*100,100);
-    document.getElementById('storage-loading').style.display='none';document.getElementById('storage-detail').style.display='block';
-    const bar=document.getElementById('storage-bar');bar.style.width=pct.toFixed(1)+'%';bar.className='storage-bar'+(pct>90?' danger':pct>70?' warn':'');
-    document.getElementById('storage-used').textContent=totalBytes>1024*1024*1024?(totalBytes/1024/1024/1024).toFixed(2)+' GB':(totalBytes/1024/1024).toFixed(1)+' MB';
-    document.getElementById('storage-limit').textContent='/ '+(SUPABASE_FREE_LIMIT/1024/1024/1024).toFixed(0)+' GB';
-    document.getElementById('storage-files').textContent=allFiles.length+' ファイル';
-    const delEl=document.getElementById('storage-deleted');
-    if(deletedCount>0){delEl.textContent=`🗑 ${deletedCount} 件の期限切れファイルを自動削除しました`;delEl.style.display='block';}
-    else{delEl.style.display='none';}
-  }catch(e){document.getElementById('storage-loading').textContent='取得エラー: '+e.message;document.getElementById('storage-loading').style.display='block';}
-}
+    // UI更新
+    const totalBytes = allFiles.reduce((s, f) => s + (f.metadata?.size || 0), 0);
+    const pct = Math.min((totalBytes / SUPABASE_FREE_LIMIT) * 100, 100);
 
-function toSafe(name){
-  const dot=name.lastIndexOf('.'),ext=dot>0?name.slice(dot):'.glb',base=dot>0?name.slice(0,dot):name;
-  if(!/[^\x00-\x7F]/.test(base)&&!/[^a-zA-Z0-9_\-]/.test(base))return name;
-  let hash=0;for(let i=0;i<base.length;i++){hash=((hash<<5)-hash)+base.charCodeAt(i);hash|=0;}
-  let a=base.replace(/[^\x00-\x7F]/g,'').replace(/[^a-zA-Z0-9_\-]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
-  if(!a)a='model';return a+'_'+(hash>>>0).toString(36).toUpperCase()+ext;
-}
+    document.getElementById('storage-loading').style.display = 'none';
+    document.getElementById('storage-detail').style.display = 'block';
 
-async function removeLights(buf){
-  const v=new DataView(buf);if(v.getUint32(0,true)!==0x46546C67)throw new Error('GLBではありません');
-  const ver=v.getUint32(4,true);let off=12,jOff=-1,jLen=0,bOff=-1,bLen=0;
-  while(off<buf.byteLength){const cLen=v.getUint32(off,true),cType=v.getUint32(off+4,true);if(cType===0x4E4F534A){jOff=off+8;jLen=cLen;}else if(cType===0x004E4942){bOff=off;bLen=cLen;}off+=8+cLen;}
-  if(jOff<0)throw new Error('JSONチャンクなし');
-  const g=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,jOff,jLen)));let n=0;
-  if(g.extensions?.KHR_lights_punctual){n+=(g.extensions.KHR_lights_punctual.lights||[]).length;delete g.extensions.KHR_lights_punctual;if(!Object.keys(g.extensions).length)delete g.extensions;}
-  ['extensionsUsed','extensionsRequired'].forEach(k=>{if(g[k]){g[k]=g[k].filter(e=>e!=='KHR_lights_punctual');if(!g[k].length)delete g[k];}});
-  (g.nodes||[]).forEach(nd=>{if(nd.extensions?.KHR_lights_punctual){delete nd.extensions.KHR_lights_punctual;if(!Object.keys(nd.extensions).length)delete nd.extensions;}});
-  let js=JSON.stringify(g);while(js.length%4)js+=' ';const jb=new TextEncoder().encode(js);
-  const tot=12+8+jb.length+(bOff>=0?8+bLen:0);const ob=new ArrayBuffer(tot);const ov=new DataView(ob);const oa=new Uint8Array(ob);
-  ov.setUint32(0,0x46546C67,true);ov.setUint32(4,ver,true);ov.setUint32(8,tot,true);ov.setUint32(12,jb.length,true);ov.setUint32(16,0x4E4F534A,true);oa.set(jb,20);
-  if(bOff>=0){const bs=20+jb.length;ov.setUint32(bs,bLen,true);ov.setUint32(bs+4,0x004E4942,true);oa.set(new Uint8Array(buf,bOff+8,bLen),bs+8);}
-  return{buffer:ob,count:n};
-}
+    const bar = document.getElementById('storage-bar');
+    bar.style.width = pct.toFixed(1) + '%';
+    bar.className = 'storage-bar' + (pct > 90 ? ' danger' : pct > 70 ? ' warn' : '');
 
-async function compressTextures(buf,maxSize,quality){
-  const v=new DataView(buf);if(v.getUint32(0,true)!==0x46546C67)throw new Error('GLBではありません');
-  const ver=v.getUint32(4,true);let off=12,jOff=-1,jLen=0,bOff=-1,bLen=0;
-  while(off<buf.byteLength){const cLen=v.getUint32(off,true),cType=v.getUint32(off+4,true);if(cType===0x4E4F534A){jOff=off+8;jLen=cLen;}else if(cType===0x004E4942){bOff=off+8;bLen=cLen;}off+=8+cLen;}
-  if(jOff<0)throw new Error('JSONチャンクなし');
-  const g=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,jOff,jLen)));
-  if(!g.images||!g.images.length||bOff<0)return{buffer:buf,saved:0};
-  const binData=new Uint8Array(buf,bOff,bLen),bvs=g.bufferViews||[];
-  const newImageChunks=[];let totalSaved=0,compressed=0;
-  for(let i=0;i<g.images.length;i++){
-    const img=g.images[i];if(img.bufferView===undefined)continue;const bv=bvs[img.bufferView];if(!bv)continue;
-    const imgOff=bv.byteOffset||0,imgLen=bv.byteLength,origBytes=binData.slice(imgOff,imgOff+imgLen);
-    const blob=new Blob([origBytes],{type:img.mimeType||'image/png'}),url=URL.createObjectURL(blob);
-    try{const result=await new Promise((resolve,reject)=>{
-      const el=new Image();el.onload=()=>{
-        let w=el.width,h=el.height;
-        if(w<=maxSize&&h<=maxSize&&img.mimeType==='image/jpeg'){resolve(null);return;}
-        if(w>maxSize||h>maxSize){const s=maxSize/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
-        const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');ctx.drawImage(el,0,0,w,h);
-        const pxData=ctx.getImageData(0,0,w,h).data;let hasAlpha=false;
-        for(let p=3;p<pxData.length;p+=4){if(pxData[p]<250){hasAlpha=true;break;}}
-        const fmt=hasAlpha?'image/png':'image/jpeg',q=hasAlpha?undefined:quality;
-        c.toBlob(b=>{if(!b){resolve(null);return;}b.arrayBuffer().then(ab=>resolve({data:new Uint8Array(ab),mime:fmt}));},fmt,q);
-      };el.onerror=()=>reject(new Error('画像ロード失敗'));el.src=url;
-    });URL.revokeObjectURL(url);
-    if(result&&result.data.length<imgLen){newImageChunks.push({bvIndex:img.bufferView,data:result.data,origLen:imgLen});totalSaved+=imgLen-result.data.length;img.mimeType=result.mime;compressed++;}}catch(e){URL.revokeObjectURL(url);}
+    document.getElementById('storage-used').textContent =
+      totalBytes > 1024 * 1024 * 1024
+        ? (totalBytes / 1024 / 1024 / 1024).toFixed(2) + ' GB'
+        : (totalBytes / 1024 / 1024).toFixed(1) + ' MB';
+    document.getElementById('storage-limit').textContent = '/ ' + (SUPABASE_FREE_LIMIT / 1024 / 1024 / 1024).toFixed(0) + ' GB';
+    document.getElementById('storage-files').textContent = allFiles.length + ' ファイル';
+
+    const delEl = document.getElementById('storage-deleted');
+    if (deletedCount > 0) {
+      delEl.textContent = '🗑 ' + deletedCount + ' 件の期限切れファイルを自動削除しました';
+      delEl.style.display = 'block';
+    } else {
+      delEl.style.display = 'none';
+    }
+  } catch (e) {
+    document.getElementById('storage-loading').textContent = '取得エラー: ' + e.message;
+    document.getElementById('storage-loading').style.display = 'block';
   }
-  if(!newImageChunks.length)return{buffer:buf,saved:0,compressed:0};
-  const replaceMap=new Map();newImageChunks.forEach(c=>replaceMap.set(c.bvIndex,c));
-  const bvEntries=bvs.map((bv,idx)=>({idx,offset:bv.byteOffset||0,length:bv.byteLength}));bvEntries.sort((a,b)=>a.offset-b.offset);
-  const newParts=[];let cursor=0;
-  for(const entry of bvEntries){
-    if(entry.offset>cursor)newParts.push(binData.slice(cursor,entry.offset));
-    const newOffset=newParts.reduce((s,p)=>s+p.length,0),replacement=replaceMap.get(entry.idx);
-    if(replacement){let data=replacement.data;const pad=(4-data.length%4)%4;if(pad>0){const padded=new Uint8Array(data.length+pad);padded.set(data);data=padded;}newParts.push(data);bvs[entry.idx].byteOffset=newOffset;bvs[entry.idx].byteLength=replacement.data.length;}
-    else{newParts.push(binData.slice(entry.offset,entry.offset+entry.length));bvs[entry.idx].byteOffset=newOffset;}
-    cursor=entry.offset+entry.length;
-  }
-  if(cursor<bLen)newParts.push(binData.slice(cursor));
-  const newBinLen=newParts.reduce((s,p)=>s+p.length,0),newBin=new Uint8Array(newBinLen);let pos=0;for(const p of newParts){newBin.set(p,pos);pos+=p.length;}
-  if(g.buffers&&g.buffers[0])g.buffers[0].byteLength=newBinLen;
-  let js=JSON.stringify(g);while(js.length%4)js+=' ';const jb=new TextEncoder().encode(js);
-  const tot=12+8+jb.length+8+newBinLen,ob=new ArrayBuffer(tot),ov=new DataView(ob),oa=new Uint8Array(ob);
-  ov.setUint32(0,0x46546C67,true);ov.setUint32(4,ver,true);ov.setUint32(8,tot,true);ov.setUint32(12,jb.length,true);ov.setUint32(16,0x4E4F534A,true);oa.set(jb,20);
-  const bs=20+jb.length;ov.setUint32(bs,newBinLen,true);ov.setUint32(bs+4,0x004E4942,true);oa.set(newBin,bs+8);
-  return{buffer:ob,saved:totalSaved,compressed};
 }
 
-// ===== QR CODE (ローカル生成フォールバック付き) =====
+/* ============================================================
+   Filename sanitization
+   ============================================================ */
+
+/** 日本語・特殊文字を含むファイル名をASCII安全名に変換 */
+function toSafe(name) {
+  const dot = name.lastIndexOf('.');
+  const ext = dot > 0 ? name.slice(dot) : '.glb';
+  const base = dot > 0 ? name.slice(0, dot) : name;
+
+  // ASCII英数字とハイフン・アンダースコアのみなら変換不要
+  if (!/[^\x00-\x7F]/.test(base) && !/[^a-zA-Z0-9_\-]/.test(base)) return name;
+
+  // ハッシュ生成
+  let hash = 0;
+  for (let i = 0; i < base.length; i++) {
+    hash = ((hash << 5) - hash) + base.charCodeAt(i);
+    hash |= 0;
+  }
+
+  // ASCII部分を抽出、無ければ "model"
+  let ascii = base.replace(/[^\x00-\x7F]/g, '').replace(/[^a-zA-Z0-9_\-]/g, '_')
+                   .replace(/_+/g, '_').replace(/^_|_$/g, '');
+  if (!ascii) ascii = 'model';
+
+  return ascii + '_' + (hash >>> 0).toString(36).toUpperCase() + ext;
+}
+
+/* ============================================================
+   GLB Processing: Light removal
+   ============================================================ */
+
+/** GLBバイナリからKHR_lights_punctualを除去 */
+async function removeLights(buf) {
+  const view = new DataView(buf);
+
+  // GLBマジックナンバー確認
+  if (view.getUint32(0, true) !== 0x46546C67) throw new Error('GLBではありません');
+  const version = view.getUint32(4, true);
+
+  // チャンク位置を特定
+  let off = 12, jsonOff = -1, jsonLen = 0, binOff = -1, binLen = 0;
+  while (off < buf.byteLength) {
+    const chunkLen = view.getUint32(off, true);
+    const chunkType = view.getUint32(off + 4, true);
+    if (chunkType === 0x4E4F534A) { jsonOff = off + 8; jsonLen = chunkLen; }      // JSON
+    else if (chunkType === 0x004E4942) { binOff = off; binLen = chunkLen; }        // BIN (ヘッダ含む位置)
+    off += 8 + chunkLen;
+  }
+  if (jsonOff < 0) throw new Error('JSONチャンクなし');
+
+  // JSONを解析してライト情報を削除
+  const gltf = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, jsonOff, jsonLen)));
+  let count = 0;
+
+  if (gltf.extensions?.KHR_lights_punctual) {
+    count += (gltf.extensions.KHR_lights_punctual.lights || []).length;
+    delete gltf.extensions.KHR_lights_punctual;
+    if (!Object.keys(gltf.extensions).length) delete gltf.extensions;
+  }
+
+  ['extensionsUsed', 'extensionsRequired'].forEach(k => {
+    if (gltf[k]) {
+      gltf[k] = gltf[k].filter(e => e !== 'KHR_lights_punctual');
+      if (!gltf[k].length) delete gltf[k];
+    }
+  });
+
+  (gltf.nodes || []).forEach(nd => {
+    if (nd.extensions?.KHR_lights_punctual) {
+      delete nd.extensions.KHR_lights_punctual;
+      if (!Object.keys(nd.extensions).length) delete nd.extensions;
+    }
+  });
+
+  // GLBを再構築
+  let jsonStr = JSON.stringify(gltf);
+  while (jsonStr.length % 4) jsonStr += ' '; // 4バイト境界パディング
+  const jsonBytes = new TextEncoder().encode(jsonStr);
+
+  const total = 12 + 8 + jsonBytes.length + (binOff >= 0 ? 8 + binLen : 0);
+  const out = new ArrayBuffer(total);
+  const outView = new DataView(out);
+  const outArr = new Uint8Array(out);
+
+  // GLBヘッダ
+  outView.setUint32(0, 0x46546C67, true); // magic
+  outView.setUint32(4, version, true);
+  outView.setUint32(8, total, true);
+
+  // JSONチャンク
+  outView.setUint32(12, jsonBytes.length, true);
+  outView.setUint32(16, 0x4E4F534A, true);
+  outArr.set(jsonBytes, 20);
+
+  // BINチャンク
+  if (binOff >= 0) {
+    const bs = 20 + jsonBytes.length;
+    outView.setUint32(bs, binLen, true);
+    outView.setUint32(bs + 4, 0x004E4942, true);
+    outArr.set(new Uint8Array(buf, binOff + 8, binLen), bs + 8);
+  }
+
+  return { buffer: out, count };
+}
+
+/* ============================================================
+   GLB Processing: Texture compression
+   ============================================================ */
+
+/** GLBバイナリ内のテクスチャをリサイズ＆JPEG圧縮 */
+async function compressTextures(buf, maxSize, quality) {
+  const view = new DataView(buf);
+  if (view.getUint32(0, true) !== 0x46546C67) throw new Error('GLBではありません');
+  const version = view.getUint32(4, true);
+
+  // チャンク位置特定
+  let off = 12, jsonOff = -1, jsonLen = 0, binOff = -1, binLen = 0;
+  while (off < buf.byteLength) {
+    const chunkLen = view.getUint32(off, true);
+    const chunkType = view.getUint32(off + 4, true);
+    if (chunkType === 0x4E4F534A) { jsonOff = off + 8; jsonLen = chunkLen; }
+    else if (chunkType === 0x004E4942) { binOff = off + 8; binLen = chunkLen; } // BINデータ開始位置
+    off += 8 + chunkLen;
+  }
+  if (jsonOff < 0) throw new Error('JSONチャンクなし');
+
+  const gltf = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, jsonOff, jsonLen)));
+  if (!gltf.images || !gltf.images.length || binOff < 0) {
+    return { buffer: buf, saved: 0, compressed: 0 };
+  }
+
+  const binData = new Uint8Array(buf, binOff, binLen);
+  const bufferViews = gltf.bufferViews || [];
+  const replacements = []; // { bvIndex, data, origLen }
+  let totalSaved = 0;
+  let compressed = 0;
+
+  // 各画像を処理
+  for (let i = 0; i < gltf.images.length; i++) {
+    const img = gltf.images[i];
+    if (img.bufferView === undefined) continue;
+    const bv = bufferViews[img.bufferView];
+    if (!bv) continue;
+
+    const imgOff = bv.byteOffset || 0;
+    const imgLen = bv.byteLength;
+    const origBytes = binData.slice(imgOff, imgOff + imgLen);
+    const blob = new Blob([origBytes], { type: img.mimeType || 'image/png' });
+    const url = URL.createObjectURL(blob);
+
+    try {
+      const result = await new Promise((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => {
+          let w = el.width, h = el.height;
+
+          // 既にサイズ内のJPEGはスキップ
+          if (w <= maxSize && h <= maxSize && img.mimeType === 'image/jpeg') {
+            resolve(null); return;
+          }
+
+          // リサイズ
+          if (w > maxSize || h > maxSize) {
+            const s = maxSize / Math.max(w, h);
+            w = Math.round(w * s); h = Math.round(h * s);
+          }
+
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(el, 0, 0, w, h);
+
+          // アルファチャンネル検出 → PNGかJPEGか判定
+          const pxData = ctx.getImageData(0, 0, w, h).data;
+          let hasAlpha = false;
+          for (let p = 3; p < pxData.length; p += 4) {
+            if (pxData[p] < 250) { hasAlpha = true; break; }
+          }
+
+          const fmt = hasAlpha ? 'image/png' : 'image/jpeg';
+          const q = hasAlpha ? undefined : quality;
+          c.toBlob(b => {
+            if (!b) { resolve(null); return; }
+            b.arrayBuffer().then(ab => resolve({ data: new Uint8Array(ab), mime: fmt }));
+          }, fmt, q);
+        };
+        el.onerror = () => reject(new Error('画像ロード失敗'));
+        el.src = url;
+      });
+      URL.revokeObjectURL(url);
+
+      if (result && result.data.length < imgLen) {
+        replacements.push({ bvIndex: img.bufferView, data: result.data, origLen: imgLen });
+        totalSaved += imgLen - result.data.length;
+        img.mimeType = result.mime;
+        compressed++;
+      }
+    } catch (e) {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  if (!replacements.length) return { buffer: buf, saved: 0, compressed: 0 };
+
+  // バイナリを再構築（bufferView のオフセットを更新）
+  const replaceMap = new Map();
+  replacements.forEach(r => replaceMap.set(r.bvIndex, r));
+
+  const bvEntries = bufferViews.map((bv, idx) => ({ idx, offset: bv.byteOffset || 0, length: bv.byteLength }));
+  bvEntries.sort((a, b) => a.offset - b.offset);
+
+  const newParts = [];
+  let cursor = 0;
+
+  for (const entry of bvEntries) {
+    // ギャップを埋める
+    if (entry.offset > cursor) newParts.push(binData.slice(cursor, entry.offset));
+
+    const newOffset = newParts.reduce((s, p) => s + p.length, 0);
+    const replacement = replaceMap.get(entry.idx);
+
+    if (replacement) {
+      let data = replacement.data;
+      // 4バイト境界パディング
+      const pad = (4 - data.length % 4) % 4;
+      if (pad > 0) { const padded = new Uint8Array(data.length + pad); padded.set(data); data = padded; }
+      newParts.push(data);
+      bufferViews[entry.idx].byteOffset = newOffset;
+      bufferViews[entry.idx].byteLength = replacement.data.length;
+    } else {
+      newParts.push(binData.slice(entry.offset, entry.offset + entry.length));
+      bufferViews[entry.idx].byteOffset = newOffset;
+    }
+    cursor = entry.offset + entry.length;
+  }
+
+  if (cursor < binLen) newParts.push(binData.slice(cursor));
+
+  // 新バイナリ結合
+  const newBinLen = newParts.reduce((s, p) => s + p.length, 0);
+  const newBin = new Uint8Array(newBinLen);
+  let pos = 0;
+  for (const p of newParts) { newBin.set(p, pos); pos += p.length; }
+
+  if (gltf.buffers && gltf.buffers[0]) gltf.buffers[0].byteLength = newBinLen;
+
+  // GLB再構築
+  let jsonStr = JSON.stringify(gltf);
+  while (jsonStr.length % 4) jsonStr += ' ';
+  const jsonBytes = new TextEncoder().encode(jsonStr);
+
+  const total = 12 + 8 + jsonBytes.length + 8 + newBinLen;
+  const out = new ArrayBuffer(total);
+  const outView = new DataView(out);
+  const outArr = new Uint8Array(out);
+
+  outView.setUint32(0, 0x46546C67, true);
+  outView.setUint32(4, version, true);
+  outView.setUint32(8, total, true);
+  outView.setUint32(12, jsonBytes.length, true);
+  outView.setUint32(16, 0x4E4F534A, true);
+  outArr.set(jsonBytes, 20);
+
+  const bs = 20 + jsonBytes.length;
+  outView.setUint32(bs, newBinLen, true);
+  outView.setUint32(bs + 4, 0x004E4942, true);
+  outArr.set(newBin, bs + 8);
+
+  return { buffer: out, saved: totalSaved, compressed };
+}
+
+/* ============================================================
+   QR Code (外部API + フォールバック)
+   ============================================================ */
+
 function generateQRUrl(text) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${encodeURIComponent(text)}&margin=1`;
+  return 'https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=' + encodeURIComponent(text) + '&margin=1';
 }
+
+/** QR API失敗時のフォールバック表示（XSS safe: textContent使用） */
 function createFallbackQR(container, url) {
-  container.innerHTML = `<div style="width:128px;height:128px;background:#fff;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:8px;text-align:center;"><div style="font-size:24px;margin-bottom:4px;">📱</div><div style="font-size:8px;color:#333;word-break:break-all;line-height:1.3;max-height:80px;overflow:hidden;">${url.substring(0,100)}...</div></div>`;
+  container.innerHTML = '';
+  const box = document.createElement('div');
+  box.style.cssText = 'width:128px;height:128px;background:#fff;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:8px;text-align:center;';
+  const icon = document.createElement('div');
+  icon.style.cssText = 'font-size:24px;margin-bottom:4px;';
+  icon.textContent = '📱';
+  const text = document.createElement('div');
+  text.style.cssText = 'font-size:8px;color:#333;word-break:break-all;line-height:1.3;max-height:80px;overflow:hidden;';
+  text.textContent = url.substring(0, 100) + '...'; // textContent = XSS safe
+  box.appendChild(icon);
+  box.appendChild(text);
+  container.appendChild(box);
 }
 
-let queue=[];
-function addFiles(files){const doRename=document.getElementById('opt-rename').checked;Array.from(files).forEach(f=>{if(!f.name.toLowerCase().endsWith('.glb')){addLog(`スキップ: ${f.name}`,'err');return;}queue.push({file:f,newName:doRename?toSafe(f.name):f.name,status:'pending',id:Math.random().toString(36).slice(2)});});renderQueue();}
-function renderQueue(){
-  const qc=document.getElementById('queue-card'),qf=document.getElementById('file-queue'),us=document.getElementById('upload-section');
-  if(!queue.length){qc.style.display='none';us.style.display='none';return;}
-  qc.style.display='block';us.classList.add('visible');qf.innerHTML='';
-  queue.forEach((item,i)=>{const changed=item.newName!==item.file.name;const sizeMB=item.file.size/1024/1024;
-    const sizeWarn = (bucketFileSizeLimit > 0 && item.file.size > bucketFileSizeLimit) ? `<div class="file-warn">⚠️ バケット上限(${(bucketFileSizeLimit/1024/1024).toFixed(0)}MB)を超えています。圧縮で小さくならない場合は上限引き上げが必要です。</div>` : '';
-    const d=document.createElement('div');d.className='file-item';d.id='fi-'+item.id;
-    d.innerHTML=`<div class="file-icon">📦</div><div class="file-info"><div class="file-orig">${esc(item.file.name)}</div><div class="file-new">${esc(item.newName)}${changed?` <span style="color:var(--warn);font-size:10px">✦変換</span>`:''}</div><div class="file-size">${sizeMB.toFixed(1)} MB</div>${sizeWarn}<div class="progress-wrap" id="pw-${item.id}"><div class="progress-bar" id="pb-${item.id}"></div></div><div class="result-section" id="rs-${item.id}"></div></div><span class="file-status pending" id="st-${item.id}">待機中</span>${item.status==='pending'?`<button class="file-remove" onclick="removeFile(${i})">✕</button>`:''}`;
-    qf.appendChild(d);});
-}
-function removeFile(i){queue.splice(i,1);renderQueue();}
-function clearQueue(){queue=queue.filter(f=>f.status!=='pending');if(queue.every(f=>f.status!=='pending'))queue=[];renderQueue();}
+/* ============================================================
+   File Queue
+   ============================================================ */
 
-async function uploadAll(){
-  const sbUrl=trimUrl(localStorage.getItem('sb_url')),sbKey=localStorage.getItem('sb_key')?.trim(),sbBucket=localStorage.getItem('sb_bucket')||'glb-models';
-  const viewerBase=trimUrl(localStorage.getItem('viewer_url'));
-  if(!sbUrl||!sbKey){alert('右上の⚙️から設定を保存してください');return;}
-  if(!viewerBase){alert('⚙️からビューアーURLを設定してください');return;}
-  const btn=document.getElementById('btn-upload');btn.disabled=true;btn.textContent='アップロード中...';
+let queue = [];
+
+function addFiles(files) {
+  const doRename = document.getElementById('opt-rename').checked;
+  Array.from(files).forEach(f => {
+    if (!f.name.toLowerCase().endsWith('.glb')) {
+      addLog('スキップ: ' + f.name, 'err');
+      return;
+    }
+    queue.push({
+      file: f,
+      newName: doRename ? toSafe(f.name) : f.name,
+      status: 'pending',
+      id: Math.random().toString(36).slice(2)
+    });
+  });
+  renderQueue();
+}
+
+function renderQueue() {
+  const queueCard = document.getElementById('queue-card');
+  const queueEl = document.getElementById('file-queue');
+  const uploadSection = document.getElementById('upload-section');
+
+  if (!queue.length) {
+    queueCard.style.display = 'none';
+    uploadSection.style.display = 'none';
+    return;
+  }
+
+  queueCard.style.display = 'block';
+  uploadSection.classList.add('visible');
+  queueEl.innerHTML = '';
+
+  queue.forEach((item, i) => {
+    const changed = item.newName !== item.file.name;
+    const sizeMB = item.file.size / 1024 / 1024;
+    const overLimit = bucketFileSizeLimit > 0 && item.file.size > bucketFileSizeLimit;
+    const sizeWarn = overLimit
+      ? '<div class="file-warn">⚠️ バケット上限(' + (bucketFileSizeLimit / 1024 / 1024).toFixed(0) + 'MB)を超えています。圧縮で小さくならない場合は上限引き上げが必要です。</div>'
+      : '';
+
+    const div = document.createElement('div');
+    div.className = 'file-item';
+    div.id = 'fi-' + item.id;
+    div.innerHTML =
+      '<div class="file-icon">📦</div>' +
+      '<div class="file-info">' +
+        '<div class="file-orig">' + esc(item.file.name) + '</div>' +
+        '<div class="file-new">' + esc(item.newName) + (changed ? ' <span style="color:var(--warn);font-size:10px">✦変換</span>' : '') + '</div>' +
+        '<div class="file-size">' + sizeMB.toFixed(1) + ' MB</div>' +
+        sizeWarn +
+        '<div class="progress-wrap" id="pw-' + item.id + '"><div class="progress-bar" id="pb-' + item.id + '"></div></div>' +
+        '<div class="result-section" id="rs-' + item.id + '"></div>' +
+      '</div>' +
+      '<span class="file-status pending" id="st-' + item.id + '">待機中</span>' +
+      (item.status === 'pending' ? '<button class="file-remove" onclick="removeFile(' + i + ')">✕</button>' : '');
+    queueEl.appendChild(div);
+  });
+}
+
+function removeFile(i) { queue.splice(i, 1); renderQueue(); }
+
+function clearQueue() {
+  queue = queue.filter(f => f.status !== 'pending');
+  if (queue.every(f => f.status !== 'pending')) queue = [];
+  renderQueue();
+}
+
+/* ============================================================
+   Upload
+   ============================================================ */
+
+async function uploadAll() {
+  const sbUrl = trimUrl(localStorage.getItem('sb_url'));
+  const sbKey = localStorage.getItem('sb_key')?.trim();
+  const sbBucket = localStorage.getItem('sb_bucket') || 'glb-models';
+  const viewerBase = trimUrl(localStorage.getItem('viewer_url'));
+
+  if (!sbUrl || !sbKey) { alert('右上の⚙️から設定を保存してください'); return; }
+  if (!viewerBase) { alert('⚙️からビューアーURLを設定してください'); return; }
+
+  const btn = document.getElementById('btn-upload');
+  btn.disabled = true;
+  btn.textContent = 'アップロード中...';
   document.getElementById('log-area').classList.add('visible');
-  const doLights=document.getElementById('opt-lights').checked,doCompress=document.getElementById('opt-compress').checked;
-  const texMaxSize=parseInt(document.getElementById('opt-tex-size').value),texQuality=parseFloat(document.getElementById('opt-tex-quality').value);
-  const today=new Date().toISOString().slice(0,10);
-  for(const item of queue){
-    if(item.status!=='pending')continue;
-    setSt(item.id,'processing','処理中...');showPw(item.id,true);setPb(item.id,5);addLog(`処理中: ${item.file.name} → ${item.newName}`,'info');
-    try{
-      let buf=await item.file.arrayBuffer();setPb(item.id,15);
-      if(doLights){try{const r=await removeLights(buf);buf=r.buffer;addLog(`  ライト ${r.count} 個削除`,r.count>0?'ok':'info');}catch(e){addLog(`  ライト削除エラー: ${e.message}`,'err');}}
-      setPb(item.id,25);
-      if(doCompress){try{setSt(item.id,'processing','圧縮中...');const r=await compressTextures(buf,texMaxSize,texQuality);buf=r.buffer;if(r.compressed>0)addLog(`  テクスチャ ${r.compressed} 枚圧縮 (-${(r.saved/1024/1024).toFixed(1)}MB → ${(buf.byteLength/1024/1024).toFixed(1)}MB)`,'ok');else addLog('  圧縮対象のテクスチャなし','info');}catch(e){addLog(`  テクスチャ圧縮エラー: ${e.message}`,'err');}}
-      setPb(item.id,60);
+
+  const doLights = document.getElementById('opt-lights').checked;
+  const doCompress = document.getElementById('opt-compress').checked;
+  const texMaxSize = parseInt(document.getElementById('opt-tex-size').value);
+  const texQuality = parseFloat(document.getElementById('opt-tex-quality').value);
+  const today = new Date().toISOString().slice(0, 10);
+
+  for (const item of queue) {
+    if (item.status !== 'pending') continue;
+
+    setSt(item.id, 'processing', '処理中...');
+    showPw(item.id, true);
+    setPb(item.id, 5);
+    addLog('処理中: ' + item.file.name + ' → ' + item.newName, 'info');
+
+    try {
+      let buf = await item.file.arrayBuffer();
+      setPb(item.id, 15);
+
+      // ライト削除
+      if (doLights) {
+        try {
+          const r = await removeLights(buf);
+          buf = r.buffer;
+          addLog('  ライト ' + r.count + ' 個削除', r.count > 0 ? 'ok' : 'info');
+        } catch (e) {
+          addLog('  ライト削除エラー: ' + e.message, 'err');
+        }
+      }
+      setPb(item.id, 25);
+
+      // テクスチャ圧縮
+      if (doCompress) {
+        try {
+          setSt(item.id, 'processing', '圧縮中...');
+          const r = await compressTextures(buf, texMaxSize, texQuality);
+          buf = r.buffer;
+          if (r.compressed > 0) {
+            addLog('  テクスチャ ' + r.compressed + ' 枚圧縮 (-' + (r.saved / 1024 / 1024).toFixed(1) + 'MB → ' + (buf.byteLength / 1024 / 1024).toFixed(1) + 'MB)', 'ok');
+          } else {
+            addLog('  圧縮対象のテクスチャなし', 'info');
+          }
+        } catch (e) {
+          addLog('  テクスチャ圧縮エラー: ' + e.message, 'err');
+        }
+      }
+      setPb(item.id, 60);
 
       // ファイルサイズチェック
       if (bucketFileSizeLimit > 0 && buf.byteLength > bucketFileSizeLimit) {
-        throw new Error(`ファイルサイズ(${(buf.byteLength/1024/1024).toFixed(1)}MB)がバケット上限(${(bucketFileSizeLimit/1024/1024).toFixed(0)}MB)を超えています。Supabase Storage設定で上限を引き上げてください。`);
+        throw new Error(
+          'ファイルサイズ(' + (buf.byteLength / 1024 / 1024).toFixed(1) + 'MB)がバケット上限(' +
+          (bucketFileSizeLimit / 1024 / 1024).toFixed(0) + 'MB)を超えています。Supabase Storage設定で上限を引き上げてください。'
+        );
       }
 
-      setSt(item.id,'processing','アップロード中...');
-      const res=await fetch(`${sbUrl}/storage/v1/object/${sbBucket}/${encodeURIComponent(item.newName)}`,{method:'POST',headers:{'Authorization':`Bearer ${sbKey}`,'apikey':sbKey,'Content-Type':'model/gltf-binary','x-upsert':'true'},body:new Blob([buf],{type:'model/gltf-binary'})});
-      setPb(item.id,90);
-      if(!res.ok){
+      // アップロード
+      setSt(item.id, 'processing', 'アップロード中...');
+      const res = await fetch(sbUrl + '/storage/v1/object/' + sbBucket + '/' + encodeURIComponent(item.newName), {
+        method: 'POST',
+        headers: { ...sbHeaders(sbKey), 'Content-Type': 'model/gltf-binary', 'x-upsert': 'true' },
+        body: new Blob([buf], { type: 'model/gltf-binary' })
+      });
+      setPb(item.id, 90);
+
+      if (!res.ok) {
         const errText = await res.text();
-        let errMsg = `HTTP ${res.status}`;
-        try { const ej = JSON.parse(errText); errMsg = ej.message || ej.error || errMsg; } catch(e) { errMsg += ': ' + errText.substring(0, 200); }
+        let errMsg = 'HTTP ' + res.status;
+        try {
+          const ej = JSON.parse(errText);
+          errMsg = ej.message || ej.error || errMsg;
+        } catch (e) {
+          errMsg += ': ' + errText.substring(0, 200);
+        }
         throw new Error(errMsg);
       }
-      const glbUrl=`${sbUrl}/storage/v1/object/public/${sbBucket}/${encodeURIComponent(item.newName)}`;
-      const viewerUrl=`${viewerBase}/?g=${encodeURIComponent(glbUrl)}&u=${today}`;
-      item.status='done';setPb(item.id,100);setSt(item.id,'done','完了 ✓');
-      showResult(item.id,glbUrl,viewerUrl);addLog('  ✓ 完了','ok');
-    }catch(e){item.status='error';setSt(item.id,'error','エラー');addLog(`  ✗ ${e.message}`,'err');}
+
+      // 成功
+      const glbUrl = sbUrl + '/storage/v1/object/public/' + sbBucket + '/' + encodeURIComponent(item.newName);
+      const viewerUrl = viewerBase + '/?g=' + encodeURIComponent(glbUrl) + '&u=' + today;
+      item.status = 'done';
+      setPb(item.id, 100);
+      setSt(item.id, 'done', '完了 ✓');
+      showResult(item.id, glbUrl, viewerUrl);
+      addLog('  ✓ 完了', 'ok');
+    } catch (e) {
+      item.status = 'error';
+      setSt(item.id, 'error', 'エラー');
+      addLog('  ✗ ' + e.message, 'err');
+    }
   }
-  btn.disabled=false;btn.textContent='アップロード開始 →';addLog('--- 完了 ---','info');refreshStorage();
+
+  btn.disabled = false;
+  btn.textContent = 'アップロード開始 →';
+  addLog('--- 完了 ---', 'info');
+  refreshStorage();
 }
 
-function showResult(id,glbUrl,viewerUrl){
-  const sec=document.getElementById('rs-'+id);if(!sec)return;
-  const qrImgUrl=generateQRUrl(viewerUrl);
-  sec.innerHTML=`
-    <div class="result-label">GLB直接URL</div>
-    <div class="url-row"><div class="url-text" id="gu-${id}">${esc(glbUrl)}</div><button class="copy-btn" id="cgb-${id}" onclick="doCopy('gu-${id}','cgb-${id}')">コピー</button></div>
-    <div class="result-label">🔗 ビューアーURL</div>
-    <div class="url-row"><div class="url-text viewer" id="vu-${id}">${esc(viewerUrl)}</div><button class="copy-btn" id="cvb-${id}" onclick="doCopy('vu-${id}','cvb-${id}')">コピー</button><button class="open-btn" onclick="window.open('${esc(viewerUrl)}','_blank')">開く ↗</button></div>
-    <div class="qr-wrap">
-      <div id="qr-container-${id}"><img src="${qrImgUrl}" width="128" height="128" style="flex-shrink:0;border-radius:4px;background:#fff;" onerror="createFallbackQR(this.parentElement,'${esc(viewerUrl)}')"></div>
-      <div class="qr-info"><div class="qr-title">📱 QRコード</div><div class="qr-hint">スマートフォンでスキャンすると<br>ウォークスルーが開きます</div></div>
-    </div>`;
+/* ============================================================
+   Result display
+   ============================================================ */
+
+function showResult(id, glbUrl, viewerUrl) {
+  const sec = document.getElementById('rs-' + id);
+  if (!sec) return;
+
+  const qrImgUrl = generateQRUrl(viewerUrl);
+  const escapedViewer = esc(viewerUrl);
+  const escapedGlb = esc(glbUrl);
+
+  sec.innerHTML =
+    '<div class="result-label">GLB直接URL</div>' +
+    '<div class="url-row"><div class="url-text" id="gu-' + id + '">' + escapedGlb + '</div>' +
+    '<button class="copy-btn" id="cgb-' + id + '" onclick="doCopy(\'gu-' + id + '\',\'cgb-' + id + '\')">コピー</button></div>' +
+    '<div class="result-label">🔗 ビューアーURL</div>' +
+    '<div class="url-row"><div class="url-text viewer" id="vu-' + id + '">' + escapedViewer + '</div>' +
+    '<button class="copy-btn" id="cvb-' + id + '" onclick="doCopy(\'vu-' + id + '\',\'cvb-' + id + '\')">コピー</button>' +
+    '<button class="open-btn" onclick="window.open(\'' + escapedViewer + '\',\'_blank\')">開く ↗</button></div>' +
+    '<div class="qr-wrap">' +
+    '<div id="qr-container-' + id + '"><img src="' + qrImgUrl + '" width="128" height="128" ' +
+    'style="flex-shrink:0;border-radius:4px;background:#fff;" ' +
+    'onerror="createFallbackQR(this.parentElement,\'' + escapedViewer + '\')"></div>' +
+    '<div class="qr-info"><div class="qr-title">📱 QRコード</div>' +
+    '<div class="qr-hint">スマートフォンでスキャンすると<br>ウォークスルーが開きます</div></div></div>';
+
   sec.classList.add('visible');
 }
 
-function setSt(id,cls,txt){const e=document.getElementById('st-'+id);if(e){e.className='file-status '+cls;e.textContent=txt;}}
-function showPw(id,v){const e=document.getElementById('pw-'+id);if(e)e.classList.toggle('visible',v);}
-function setPb(id,p){const e=document.getElementById('pb-'+id);if(e)e.style.width=p+'%';}
-function doCopy(tid,bid){const t=document.getElementById(tid)?.textContent||'',b=document.getElementById(bid);navigator.clipboard.writeText(t).then(()=>{if(b){b.textContent='✓ コピー済み';b.classList.add('copied');setTimeout(()=>{b.textContent='コピー';b.classList.remove('copied');},2000);}});}
-function addLog(msg,type='info'){const e=document.getElementById('log-content'),d=document.createElement('div');d.className='log-'+type;d.textContent=msg;e.appendChild(d);e.scrollTop=e.scrollHeight;}
-function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+/* ============================================================
+   UI Helpers
+   ============================================================ */
 
-const dz=document.getElementById('drop-zone'),fi=document.getElementById('file-input');
-dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
-dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
-dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');addFiles(e.dataTransfer.files);});
-fi.addEventListener('change',e=>{addFiles(e.target.files);e.target.value='';});
-loadConfig();refreshStorage();
+function setSt(id, cls, txt) {
+  const el = document.getElementById('st-' + id);
+  if (el) { el.className = 'file-status ' + cls; el.textContent = txt; }
+}
+
+function showPw(id, visible) {
+  const el = document.getElementById('pw-' + id);
+  if (el) el.classList.toggle('visible', visible);
+}
+
+function setPb(id, pct) {
+  const el = document.getElementById('pb-' + id);
+  if (el) el.style.width = pct + '%';
+}
+
+function doCopy(textId, btnId) {
+  const text = document.getElementById(textId)?.textContent || '';
+  const btn = document.getElementById(btnId);
+  navigator.clipboard.writeText(text).then(() => {
+    if (btn) {
+      btn.textContent = '✓ コピー済み';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'コピー'; btn.classList.remove('copied'); }, 2000);
+    }
+  });
+}
+
+function addLog(msg, type) {
+  type = type || 'info';
+  const container = document.getElementById('log-content');
+  const line = document.createElement('div');
+  line.className = 'log-' + type;
+  line.textContent = msg; // textContent = XSS safe
+  container.appendChild(line);
+  container.scrollTop = container.scrollHeight;
+}
+
+/* ============================================================
+   Init
+   ============================================================ */
+
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); addFiles(e.dataTransfer.files); });
+fileInput.addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+
+loadConfig();
+refreshStorage();
 </script>
 </body>
 </html>
