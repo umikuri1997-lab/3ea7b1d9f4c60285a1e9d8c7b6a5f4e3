@@ -546,7 +546,7 @@ async function gltfOptimize(buf, doRemoveLights) {
   if (binChunk && gltf.buffers && gltf.buffers[0]) {
     const BUFFER_KEY = 'buffer0.bin';
     gltf.buffers[0].uri = BUFFER_KEY;
-    resources[BUFFER_KEY] = binChunk;
+    resources[BUFFER_KEY] = new Uint8Array(binChunk);
   }
 
   const doc = await io.readJSON({ json: gltf, resources });
