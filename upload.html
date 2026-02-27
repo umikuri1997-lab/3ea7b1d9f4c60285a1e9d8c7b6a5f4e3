@@ -536,7 +536,7 @@ async function gltfOptimize(buf, doRemoveLights) {
   // メッシュ最適化
   await doc.transform(
     gt_dedup(),
-    // prune() は一部の拡張/参照を『未使用』と誤判定してテクスチャを削除するケースがあるため無効化
+    gt_prune(),
     gt_weld({ tolerance: 0.0001 })
   );
 
@@ -860,50 +860,19 @@ async function uploadAll() {
       const origSize = buf.byteLength;
       setPb(item.id, 10);
 
-      // gltf-transform ロード待ち（まだ読み込み中の場合）
-      if (!gltfReady) await gltfLoadPromise;
-
-      // gltf-transform が使える場合: ライト削除 + dedup/prune/weld
-      if (gltfReady) {
+      // ① ライト削除（手動 — gltf-transform前に元GLBで実施）
+      if (doLights) {
         try {
-          setSt(item.id, 'processing', '最適化中...');
-          const r = await gltfOptimize(buf, doLights);
-          const saved = origSize - r.buffer.byteLength;
+          const r = await removeLights(buf);
           buf = r.buffer;
-          if (r.lightRemoved) addLog('  ライト拡張を削除', 'ok');
-          if (saved > 0) {
-            addLog('  dedup/prune/weld: -' + (saved / 1024 / 1024).toFixed(1) + 'MB (' + (buf.byteLength / 1024 / 1024).toFixed(1) + 'MB)', 'ok');
-          } else {
-            addLog('  dedup/prune/weld: 削減対象なし', 'info');
-          }
+          if (r.count > 0) addLog('  ライト ' + r.count + ' 個削除', 'ok');
         } catch (e) {
-          addLog('  gltf-transform エラー、手動処理にフォールバック: ' + e.message, 'err');
-          // フォールバック: 手動ライト削除
-          if (doLights) {
-            try {
-              const r = await removeLights(buf);
-              buf = r.buffer;
-              addLog('  ライト ' + r.count + ' 個削除（フォールバック）', r.count > 0 ? 'ok' : 'info');
-            } catch (e2) {
-              addLog('  ライト削除エラー: ' + e2.message, 'err');
-            }
-          }
-        }
-      } else {
-        // gltf-transform 未ロード: 手動ライト削除のみ
-        if (doLights) {
-          try {
-            const r = await removeLights(buf);
-            buf = r.buffer;
-            addLog('  ライト ' + r.count + ' 個削除', r.count > 0 ? 'ok' : 'info');
-          } catch (e) {
-            addLog('  ライト削除エラー: ' + e.message, 'err');
-          }
+          addLog('  ライト削除エラー: ' + e.message, 'err');
         }
       }
-      setPb(item.id, 35);
+      setPb(item.id, 20);
 
-      // テクスチャ圧縮
+      // ② テクスチャ圧縮（元バイナリレイアウトのまま処理）
       if (doCompress) {
         try {
           setSt(item.id, 'processing', '圧縮中...');
@@ -916,6 +885,26 @@ async function uploadAll() {
           }
         } catch (e) {
           addLog('  テクスチャ圧縮エラー: ' + e.message, 'err');
+        }
+      }
+      setPb(item.id, 40);
+
+      // ③ gltf-transform 最適化（dedup/prune/weld — テクスチャ圧縮済みGLBに対して）
+      if (!gltfReady) await gltfLoadPromise;
+      if (gltfReady) {
+        try {
+          setSt(item.id, 'processing', '最適化中...');
+          const beforeOpt = buf.byteLength;
+          const r = await gltfOptimize(buf, false); // ライトは①で削除済み
+          const saved = beforeOpt - r.buffer.byteLength;
+          buf = r.buffer;
+          if (saved > 0) {
+            addLog('  dedup/prune/weld: -' + (saved / 1024 / 1024).toFixed(1) + 'MB (' + (buf.byteLength / 1024 / 1024).toFixed(1) + 'MB)', 'ok');
+          } else {
+            addLog('  dedup/prune/weld: 削減対象なし', 'info');
+          }
+        } catch (e) {
+          addLog('  gltf-transform 最適化スキップ: ' + e.message, 'err');
         }
       }
       setPb(item.id, 60);
