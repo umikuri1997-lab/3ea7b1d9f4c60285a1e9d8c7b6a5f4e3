@@ -166,6 +166,7 @@
     <div class="option-row"><label class="toggle"><input type="checkbox" id="opt-rename" checked><div class="toggle-slider"></div></label><div><div class="option-label">日本語ファイル名を変換</div><div class="option-desc">日本語・記号含む場合タイムスタンプIDに変換</div></div></div>
     <div class="option-row"><label class="toggle"><input type="checkbox" id="opt-lights" checked><div class="toggle-slider"></div></label><div><div class="option-label">GLB内のライトを削除</div><div class="option-desc">すべてのライトを除去（ビューアー側で再生成）</div></div></div>
     <div class="option-row"><label class="toggle"><input type="checkbox" id="opt-compress" checked><div class="toggle-slider"></div></label><div><div class="option-label">テクスチャを圧縮</div><div class="option-desc">リサイズ＆圧縮（透過はPNG保持）</div></div></div>
+    <div class="option-row"><label class="toggle"><input type="checkbox" id="opt-join"><div class="toggle-slider"></div></label><div><div class="option-label">メッシュを結合</div><div class="option-desc">同一マテリアルのオブジェクトをひとつに統合（ドローコール削減）</div></div></div>
     <div id="compress-options" style="padding:8px 0 0 46px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
         <label style="font-size:11px;color:var(--muted);width:80px;">最大サイズ</label>
@@ -229,7 +230,7 @@
    gltf-transform (非同期読み込み、失敗時はフォールバック)
    ============================================================ */
 let gltfReady = false;
-let WebIO, gt_dedup, gt_prune, gt_weld;
+let WebIO, gt_dedup, gt_prune, gt_weld, gt_join, gt_flatten;
 
 const gltfLoadPromise = Promise.all([
   import('@gltf-transform/core'),
@@ -239,6 +240,8 @@ const gltfLoadPromise = Promise.all([
   gt_dedup = functions.dedup;
   gt_prune = functions.prune;
   gt_weld = functions.weld;
+  gt_join = functions.join;
+  gt_flatten = functions.flatten;
   gltfReady = true;
   console.log('gltf-transform loaded');
 }).catch(e => {
@@ -518,7 +521,7 @@ async function removeLights(buf) {
    dedup(重複除去) + prune(未使用削除) + weld(頂点結合) + ライト削除
    ============================================================ */
 
-async function gltfOptimize(buf, doRemoveLights) {
+async function gltfOptimize(buf, doRemoveLights, doJoin) {
   const io = new WebIO();
 
   // Blob→fetch→arrayBufferで完全にクリーンなバッファを取得
@@ -541,17 +544,24 @@ async function gltfOptimize(buf, doRemoveLights) {
     }
 
     // メッシュ最適化
-    await doc.transform(
-      gt_dedup(),
-      gt_prune(),
-      gt_weld({ tolerance: 0.0001 })
-    );
+    const transforms = [gt_dedup(), gt_prune(), gt_weld({ tolerance: 0.0001 })];
+
+    // メッシュ結合: flatten(シーン階層を平坦化) → join(同一マテリアルを統合)
+    if (doJoin && gt_flatten && gt_join) {
+      transforms.push(gt_flatten());
+      transforms.push(gt_join());
+      transforms.push(gt_prune()); // 孤立ノードを再クリーン
+    }
+
+    await doc.transform(...transforms);
 
     const glbBytes = await io.writeBinary(doc);
     const resultBuf = new ArrayBuffer(glbBytes.byteLength);
     new Uint8Array(resultBuf).set(glbBytes);
 
-    return { buffer: resultBuf, lightRemoved };
+    // 結合後のメッシュ数を返す
+    const meshCount = doc.getRoot().listMeshes().length;
+    return { buffer: resultBuf, lightRemoved, meshCount };
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -858,6 +868,7 @@ async function uploadAll() {
 
   const doLights = document.getElementById('opt-lights').checked;
   const doCompress = document.getElementById('opt-compress').checked;
+  const doJoin = document.getElementById('opt-join').checked;
   const texMaxSize = parseInt(document.getElementById('opt-tex-size').value);
   const texQuality = parseFloat(document.getElementById('opt-tex-quality').value);
   const today = new Date().toISOString().slice(0, 10);
@@ -910,13 +921,18 @@ async function uploadAll() {
         try {
           setSt(item.id, 'processing', '最適化中...');
           const beforeOpt = buf.byteLength;
-          const r = await gltfOptimize(buf, false); // ライトは①で削除済み
+          const r = await gltfOptimize(buf, false, doJoin); // ライトは①で削除済み
           const saved = beforeOpt - r.buffer.byteLength;
           buf = r.buffer;
+          let optMsg = 'dedup/prune/weld';
+          if (doJoin) optMsg += '/join';
           if (saved > 0) {
-            addLog('  dedup/prune/weld: -' + (saved / 1024 / 1024).toFixed(1) + 'MB (' + (buf.byteLength / 1024 / 1024).toFixed(1) + 'MB)', 'ok');
+            addLog('  ' + optMsg + ': -' + (saved / 1024 / 1024).toFixed(1) + 'MB (' + (buf.byteLength / 1024 / 1024).toFixed(1) + 'MB)', 'ok');
           } else {
-            addLog('  dedup/prune/weld: 削減対象なし', 'info');
+            addLog('  ' + optMsg + ': 削減対象なし', 'info');
+          }
+          if (doJoin && r.meshCount !== undefined) {
+            addLog('  メッシュ結合後: ' + r.meshCount + ' メッシュ', 'ok');
           }
         } catch (e) {
           addLog('  gltf-transform 最適化スキップ: ' + e.message, 'err');
