@@ -150,7 +150,7 @@
 </div>
 
 <div id="ui">
-  <div id="topbar"><div id="logo">Walk<span style="color:var(--text)">View</span></div><div id="model-name"></div></div>
+  <div id="topbar"><div id="logo">Walk<span style="color:var(--text)">View</span></div><div id="model-name"></div><button id="btn-capture" class="btn secondary" onclick="captureAllCameras()" style="display:none;white-space:nowrap;font-size:10px;padding:5px 10px">📸 全カメラ保存</button></div>
   <button id="panel-toggle" onclick="togglePanel()">☰</button>
   <div id="panel-left">
     <div class="panel-section"><div class="panel-header open" onclick="toggleSection(this)"><span>📷 カメラ</span><span class="arrow">▾</span></div><div class="panel-body open" id="camera-list"><div style="padding:16px 20px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">GLBを読み込むと表示</div></div></div>
@@ -178,10 +178,6 @@
       <div class="slider-row"><label>Bloom 閾値</label><input type="range" min="0" max="1.5" step="0.01" value="0.9" id="sl-bloom-th" oninput="updateLighting()"><span class="slider-val" id="sv-bloom-th">0.90</span></div>
       <div style="padding:4px 16px 12px"><button class="btn secondary" style="width:100%;padding:6px;font-size:10px" onclick="resetLighting()">リセット</button></div>
     </div></div>
-    <div class="panel-section"><div class="panel-header" onclick="toggleSection(this)"><span>✨ 品質設定</span><span class="arrow">▾</span></div><div class="panel-body" id="quality-body">
-      <div class="hdr-toggle-row"><span class="hdr-toggle-label">SSAO（環境遮蔽）</span><label class="mini-toggle"><input type="checkbox" id="toggle-ssao" onchange="setSSAO(this.checked)"><div class="mini-slider"></div></label></div>
-      <div style="padding:0 20px 12px;font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);line-height:1.7">コーナーや接触部に自然な影。<br>⚠️ 重いため必要時のみON</div>
-    </div></div>
     <div style="margin-top:auto;"><div id="controls-hint"><span class="hint-key">W A S D</span> 移動<br><span class="hint-key">Mouse</span> 視点<br><span class="hint-key">Space</span> 上昇 &nbsp;<span class="hint-key">Shift</span> 下降<br><span class="hint-key">Esc</span> 解放<br><br><span style="color:var(--accent)">📱 モバイル</span><br>左半分ドラッグ → 移動<br>右半分ドラッグ → 視点</div></div>
   </div>
   <div id="crosshair"></div>
@@ -205,8 +201,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
-import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 
 /* ── Utility ── */
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -249,7 +244,7 @@ if (uploadedDate) {
 
 /* ── Renderer ── */
 const container = document.getElementById('canvas-container');
-const renderer = new THREE.WebGLRenderer({ antialias: isMobile }); // PC: FXAA使用、スマホ: ハードウェアMSAA
+const renderer = new THREE.WebGLRenderer({ antialias: true }); // MSAA常時ON + PC側はSMAAも重ねがけ
 renderer.setPixelRatio(isMobile ? 1.0 : Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = !isMobile;
@@ -268,7 +263,7 @@ let activeCamera = walkCamera;
 let glbCameras = [];
 let activeCamIdx = -1;
 
-/* ── Post-processing (PC only): Bloom + FXAA + Vignette/Grain ── */
+/* ── Post-processing (PC only): Bloom + SMAA + Vignette/Grain ── */
 const VignetteGrainShader = {
   uniforms: {
     'tDiffuse': { value: null },
@@ -295,24 +290,16 @@ const VignetteGrainShader = {
   ].join('\n')
 };
 
-let composer = null, renderPass = null, bloomPass = null, fxaaPass = null, vignetteGrainPass = null, ssaoPass = null;
+let composer = null, renderPass = null, bloomPass = null, smaaPass = null, vignetteGrainPass = null;
 if (!isMobile) {
   composer = new EffectComposer(renderer);
   renderPass = new RenderPass(scene, walkCamera);
   composer.addPass(renderPass);
-  // SSAO（デフォルトOFF、重いのでトグルで制御）
-  ssaoPass = new SSAOPass(scene, walkCamera, window.innerWidth, window.innerHeight);
-  ssaoPass.kernelRadius = 12;
-  ssaoPass.minDistance = 0.002;
-  ssaoPass.maxDistance = 0.08;
-  ssaoPass.enabled = false;
-  composer.addPass(ssaoPass);
   bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.05, 0.4, 0.9);
   composer.addPass(bloomPass);
   composer.addPass(new OutputPass());
-  fxaaPass = new ShaderPass(FXAAShader);
-  fxaaPass.uniforms['resolution'].value.set(1 / window.innerWidth, 1 / window.innerHeight);
-  composer.addPass(fxaaPass);
+  smaaPass = new SMAAPass(window.innerWidth * renderer.getPixelRatio(), window.innerHeight * renderer.getPixelRatio());
+  composer.addPass(smaaPass);
   vignetteGrainPass = new ShaderPass(VignetteGrainShader);
   composer.addPass(vignetteGrainPass);
 }
@@ -505,10 +492,11 @@ function loadGLB(url, displayUrl) {
       });
       scene.add(gltf.scene);
 
-      // Emissive → SpotLight 変換
+      // Emissive → SpotLight 変換（スマホは省略して軽量化）
       setLoading('ライトを配置中...', 80);
-      const ec = [];
-      gltf.scene.traverse(obj => {
+      if (!isMobile) {
+        const ec = [];
+        gltf.scene.traverse(obj => {
         if (!obj.isMesh) return;
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         for (const m of mats) {
@@ -522,18 +510,15 @@ function loadGLB(url, displayUrl) {
       });
       ec.sort((a, b) => b.intensity - a.intensity);
       ec.slice(0, 32).forEach(c => {
-        const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(80), 0.2); // penumbra 0.5→0.2でシャープな影
+        const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(80), 0.2);
         sl.position.copy(c.pos); sl.castShadow = false;
-        if (!isMobile) { sl.shadow.mapSize.set(2048, 2048); sl.shadow.bias = -0.001; sl.shadow.normalBias = 0.01; }
+        sl.shadow.mapSize.set(2048, 2048); sl.shadow.bias = -0.001; sl.shadow.normalBias = 0.01;
         sl.userData.baseIntensity = c.intensity;
         sl.target.position.set(c.pos.x, c.pos.y - 1, c.pos.z);
         scene.add(sl); scene.add(sl.target);
         emissiveLights.push(sl);
       });
-      if (isMobile) {
-        dirLight.intensity = 3;
-        emissiveLights.forEach(l => { l.intensity = l.userData.baseIntensity * 0.1; });
-      }
+      } // end !isMobile SpotLight block
 
       // カメラ設定
       setLoading('カメラを設定中...', 90);
@@ -569,6 +554,7 @@ function loadGLB(url, displayUrl) {
 
       const parts = (displayUrl || url).split('/');
       document.getElementById('model-name').textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb');
+      document.getElementById('btn-capture').style.display = 'block';
       activeCamera = walkCamera; activeCamIdx = -1;
       if (glbCameras.length > 0) switchCamera(0);
     },
@@ -796,8 +782,47 @@ window.updateLighting = function () {
   document.getElementById('sv-bloom-th').textContent = bTh.toFixed(2);
 };
 
-window.setSSAO = function (enabled) {
-  if (ssaoPass) ssaoPass.enabled = enabled;
+/* ── 全カメラ一括キャプチャ ── */
+window.captureAllCameras = async function () {
+  if (!loadedModel) return;
+  const btn = document.getElementById('btn-capture');
+  btn.disabled = true;
+  btn.textContent = '📸 撮影中...';
+
+  const W = window.innerWidth, H = window.innerHeight;
+  const dpr = renderer.getPixelRatio();
+
+  // 撮影対象: GLBカメラ全部 ＋ 現在のウォークスルー視点
+  const targets = [
+    { label: 'walkthrough', cam: walkCamera }
+  ].concat(glbCameras.map((c, i) => ({ label: c.name || ('camera_' + (i+1)), cam: c })));
+
+  for (const { label, cam } of targets) {
+    // アスペクト比を現在のウィンドウに合わせる
+    if (cam.isPerspectiveCamera) { cam.aspect = W / H; cam.updateProjectionMatrix(); }
+
+    // composerがある場合はrenderPassのカメラを切り替えてcomposerでレンダリング
+    if (composer) {
+      renderPass.camera = cam;
+      composer.render();
+    } else {
+      renderer.render(scene, cam);
+    }
+
+    // canvasからPNG取得してダウンロード
+    const dataUrl = renderer.domElement.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = label.replace(/[^\w\-]/g, '_') + '.png';
+    a.click();
+    await new Promise(r => setTimeout(r, 400)); // ダウンロードが重なりすぎないよう少し待つ
+  }
+
+  // 元のカメラに戻す
+  if (composer) renderPass.camera = activeCamera;
+
+  btn.disabled = false;
+  btn.textContent = '📸 全カメラ保存';
 };
 
 window.resetLighting = function () {
@@ -822,8 +847,7 @@ window.addEventListener('resize', () => {
   if (composer) {
     composer.setSize(w, h);
     bloomPass.resolution.set(w, h);
-    if (fxaaPass) fxaaPass.uniforms['resolution'].value.set(1 / w, 1 / h);
-    if (ssaoPass) ssaoPass.setSize(w, h);
+    if (smaaPass) smaaPass.setSize(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
   }
 });
 
@@ -973,7 +997,6 @@ function animate(time) {
   requestAnimationFrame(animate);
   updateWalk();
   if (vignetteGrainPass) vignetteGrainPass.uniforms['time'].value = time * 0.001;
-  if (ssaoPass && ssaoPass.enabled) ssaoPass.camera = activeCamera;
   if (composer) { renderPass.camera = activeCamera; composer.render(); }
   else { renderer.render(scene, activeCamera); }
   updateMeasureLabels();
