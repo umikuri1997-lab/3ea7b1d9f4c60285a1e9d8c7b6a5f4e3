@@ -173,7 +173,7 @@
       <div class="slider-row"><label>地面色</label><input type="color" value="#ffffff" id="sl-hemi-gnd" oninput="updateLighting()"><span class="slider-val" id="sv-hemi-gnd">#ffffff</span></div>
       <div class="slider-group-label">▸ マテリアル / ポスプロ</div>
       <div class="slider-row"><label>反射強度</label><input type="range" min="0" max="4" step="0.1" value="0.1" id="sl-envmap" oninput="updateLighting()"><span class="slider-val" id="sv-envmap">0.1</span></div>
-      <div class="slider-row"><label>放射光 強度</label><input type="range" min="0" max="10" step="0.1" value="0.2" id="sl-emissive-mul" oninput="updateLighting()"><span class="slider-val" id="sv-emissive-mul">0.2</span></div>
+      <div class="slider-row"><label>放射光 強度</label><input type="range" min="0" max="10" step="0.1" value="0.05" id="sl-emissive-mul" oninput="updateLighting()"><span class="slider-val" id="sv-emissive-mul">0.05</span></div>
       <div style="padding:4px 16px 12px"><button class="btn secondary" style="width:100%;padding:6px;font-size:10px" onclick="resetLighting()">リセット</button></div>
     </div></div>
     <div class="panel-section"><div class="panel-header" onclick="toggleSection(this)"><span>📸 書き出し</span><span class="arrow">▾</span></div><div class="panel-body" id="export-body">
@@ -319,8 +319,8 @@ dirLight.castShadow = !isMobile;
 if (!isMobile) {
   Object.assign(dirLight.shadow.mapSize, { width: 2048, height: 2048 });
   Object.assign(dirLight.shadow.camera, { near: 0.1, far: 300, left: -60, right: 60, top: 60, bottom: -60 });
-  dirLight.shadow.bias = -0.002;
-  dirLight.shadow.normalBias = 0.03;
+  dirLight.shadow.bias = 0;
+  dirLight.shadow.normalBias = 0;
 }
 scene.add(dirLight);
 
@@ -515,7 +515,7 @@ function loadGLB(url, displayUrl) {
       ec.sort((a, b) => b.intensity - a.intensity);
       ec.slice(0, 32).forEach(c => {
         const pl = new THREE.PointLight(c.color, c.intensity, c.distance);
-        pl.position.set(c.pos.x, c.pos.y - 0.8, c.pos.z); // 照明オブジェクトより80cm下
+        pl.position.set(c.pos.x, c.pos.y - 1.0, c.pos.z); // 照明オブジェクトより100cm下
         pl.castShadow = false;
         pl.userData.baseIntensity = c.intensity;
         scene.add(pl);
@@ -727,7 +727,7 @@ window.toggleSection = function (h) { h.classList.toggle('open'); h.nextElementS
 const LIGHT_DEFAULTS = {
   exposure: 0.7, dir: 10, dirColor: '#ffffff', dirAzimuth: 45, dirElevation: 60, dirShadow: true,
   amb: 0.6, ambColor: '#ffffff', hemi: 1.0, hemiSky: '#ffffff', hemiGnd: '#ffffff',
-  envmap: 0.1, emissiveMul: 0.2
+  envmap: 0.1, emissiveMul: 0.05
 };
 let dirLightDist = 50, dirLightCenter = new THREE.Vector3();
 
