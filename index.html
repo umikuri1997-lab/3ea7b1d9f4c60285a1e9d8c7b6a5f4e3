@@ -498,7 +498,7 @@ function loadGLB(url, displayUrl) {
         if (!obj.isMesh) return;
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         for (const m of mats) {
-          if ((m.emissiveIntensity || 0) >= 100 && m.emissive) {
+          if ((m.emissiveIntensity || 0) >= 1 && m.emissive) {
             const pos = new THREE.Vector3(); obj.getWorldPosition(pos);
             const box3 = new THREE.Box3().setFromObject(obj);
             const sz = box3.getSize(new THREE.Vector3());
@@ -747,13 +747,17 @@ let dirLightDist = 50, dirLightCenter = new THREE.Vector3();
 /* ── カメラ近接8灯選択 ── */
 function updateNearestLights() {
   if (!emissiveLightGroups.length) return;
-  const camXZ = new THREE.Vector2(activeCamera.position.x, activeCamera.position.z);
+  const camPos = activeCamera.position;
+  const camXZ = new THREE.Vector2(camPos.x, camPos.z);
+  console.log('[NearestLights] cam=', camPos.x.toFixed(1), camPos.z.toFixed(1), 'groups=', emissiveLightGroups.length);
   const sorted = emissiveLightGroups.slice().sort((a, b) =>
     a.xz.distanceTo(camXZ) - b.xz.distanceTo(camXZ)
   );
+  const emMul = parseFloat(document.getElementById('sl-emissive-mul')?.value || 0.2);
   sorted.forEach((g, i) => {
-    g.sl.visible = i < 8;
-    g.pl.visible = i < 8;
+    const on = i < 8;
+    g.sl.intensity = on ? g.sl.userData.baseIntensity * emMul : 0;
+    g.pl.intensity = on ? g.pl.userData.baseIntensity : 0;
   });
 }
 
@@ -782,10 +786,15 @@ window.updateLighting = function () {
   hemiLight.intensity = hemi; hemiLight.color.set(hemiSky); hemiLight.groundColor.set(hemiGnd);
 
   const mul = isMobile ? 0.1 : emMul;
-  emissiveLights.forEach(l => {
-    if (l.userData.isPoint) return; // PointLightは固定
-    l.intensity = l.userData.baseIntensity * mul;
-  });
+  // emissiveLightGroupsがある場合はupdateNearestLightsに委ねる
+  if (emissiveLightGroups.length) {
+    updateNearestLights();
+  } else {
+    emissiveLights.forEach(l => {
+      if (l.userData.isPoint) return;
+      l.intensity = l.userData.baseIntensity * mul;
+    });
+  }
 
   if (loadedModel) loadedModel.traverse(o => {
     if (!o.isMesh) return;
