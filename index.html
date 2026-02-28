@@ -1057,19 +1057,9 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
 
 /* ── Animation loop ── */
 let lastTime = 0, frameCount = 0;
-const _lastCamXZ = new THREE.Vector2();
-let _nearestDirty = true;
 function animate(time) {
   requestAnimationFrame(animate);
   updateWalk();
-
-  // カメラ移動時にライト近接更新
-  const cx = activeCamera.position.x, cz = activeCamera.position.z;
-  if (_nearestDirty || Math.abs(cx - _lastCamXZ.x) > 0.05 || Math.abs(cz - _lastCamXZ.y) > 0.05) {
-    _lastCamXZ.set(cx, cz);
-    _nearestDirty = false;
-    updateNearestLights();
-  }
 
   if (composer) { renderPass.camera = activeCamera; composer.render(); }
   else { renderer.render(scene, activeCamera); }
