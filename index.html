@@ -290,8 +290,7 @@ const VignetteGrainShader = {
     '  col.rgb += grain;',
     '  gl_FragColor = col;',
     '}'
-  ].join('
-')
+  ].join('\n')
 };
 
 let composer = null, renderPass = null, smaaPass = null, vignetteGrainPass = null;
