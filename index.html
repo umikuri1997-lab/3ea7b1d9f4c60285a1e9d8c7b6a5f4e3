@@ -150,7 +150,7 @@
 </div>
 
 <div id="ui">
-  <div id="topbar"><div id="logo">Walk<span style="color:var(--text)">View</span></div><div id="model-name"></div><button id="btn-capture" class="btn secondary" onclick="captureAllCameras()" style="display:none;white-space:nowrap;font-size:10px;padding:5px 10px">📸 全カメラ保存</button></div>
+  <div id="topbar"><div id="logo">Walk<span style="color:var(--text)">View</span></div><div id="model-name"></div></div>
   <button id="panel-toggle" onclick="togglePanel()">☰</button>
   <div id="panel-left">
     <div class="panel-section"><div class="panel-header open" onclick="toggleSection(this)"><span>📷 カメラ</span><span class="arrow">▾</span></div><div class="panel-body open" id="camera-list"><div style="padding:16px 20px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">GLBを読み込むと表示</div></div></div>
@@ -178,6 +178,12 @@
       <div class="slider-row"><label>Bloom 閾値</label><input type="range" min="0" max="1.5" step="0.01" value="0.9" id="sl-bloom-th" oninput="updateLighting()"><span class="slider-val" id="sv-bloom-th">0.90</span></div>
       <div style="padding:4px 16px 12px"><button class="btn secondary" style="width:100%;padding:6px;font-size:10px" onclick="resetLighting()">リセット</button></div>
     </div></div>
+    <div class="panel-section"><div class="panel-header" onclick="toggleSection(this)"><span>📸 書き出し</span><span class="arrow">▾</span></div><div class="panel-body" id="export-body">
+      <div style="padding:12px 16px 14px">
+        <button id="btn-capture" class="btn" style="width:100%;padding:9px;font-size:12px" onclick="captureAllCameras()" disabled>全カメラをZIPで保存</button>
+        <div id="capture-status" style="margin-top:8px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-align:center;display:none"></div>
+      </div>
+    </div></div>
     <div style="margin-top:auto;"><div id="controls-hint"><span class="hint-key">W A S D</span> 移動<br><span class="hint-key">Mouse</span> 視点<br><span class="hint-key">Space</span> 上昇 &nbsp;<span class="hint-key">Shift</span> 下降<br><span class="hint-key">Esc</span> 解放<br><br><span style="color:var(--accent)">📱 モバイル</span><br>左半分ドラッグ → 移動<br>右半分ドラッグ → 視点</div></div>
   </div>
   <div id="crosshair"></div>
@@ -188,6 +194,7 @@
   <div id="measure-hint">計測: 壁・床・天井をクリック → 対面までの距離</div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
 </script>
@@ -269,7 +276,7 @@ const VignetteGrainShader = {
     'tDiffuse': { value: null },
     'time': { value: 0 },
     'vignetteIntensity': { value: 0.25 },
-    'grainIntensity': { value: 0.03 }
+    'grainIntensity': { value: 0.0 }
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
   fragmentShader: [
@@ -292,7 +299,10 @@ const VignetteGrainShader = {
 
 let composer = null, renderPass = null, bloomPass = null, smaaPass = null, vignetteGrainPass = null;
 if (!isMobile) {
-  composer = new EffectComposer(renderer);
+  const renderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
+    samples: 4 // ハードウェアMSAA x4（GPU処理なので軽い）
+  });
+  composer = new EffectComposer(renderer, renderTarget);
   renderPass = new RenderPass(scene, walkCamera);
   composer.addPass(renderPass);
   bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.05, 0.4, 0.9);
@@ -554,7 +564,7 @@ function loadGLB(url, displayUrl) {
 
       const parts = (displayUrl || url).split('/');
       document.getElementById('model-name').textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb');
-      document.getElementById('btn-capture').style.display = 'block';
+      document.getElementById('btn-capture').disabled = false;
       activeCamera = walkCamera; activeCamIdx = -1;
       if (glbCameras.length > 0) switchCamera(0);
     },
@@ -782,47 +792,53 @@ window.updateLighting = function () {
   document.getElementById('sv-bloom-th').textContent = bTh.toFixed(2);
 };
 
-/* ── 全カメラ一括キャプチャ ── */
+/* ── 全カメラ一括キャプチャ → ZIP ── */
 window.captureAllCameras = async function () {
   if (!loadedModel) return;
   const btn = document.getElementById('btn-capture');
+  const status = document.getElementById('capture-status');
   btn.disabled = true;
-  btn.textContent = '📸 撮影中...';
+  status.style.display = 'block';
 
   const W = window.innerWidth, H = window.innerHeight;
-  const dpr = renderer.getPixelRatio();
+  const zip = new JSZip();
 
-  // 撮影対象: GLBカメラ全部 ＋ 現在のウォークスルー視点
-  const targets = [
-    { label: 'walkthrough', cam: walkCamera }
-  ].concat(glbCameras.map((c, i) => ({ label: c.name || ('camera_' + (i+1)), cam: c })));
+  // 撮影対象: GLBカメラのみ
+  const targets = glbCameras.map((c, i) => ({ label: c.name || ('camera_' + (i + 1)), cam: c }));
 
-  for (const { label, cam } of targets) {
-    // アスペクト比を現在のウィンドウに合わせる
+  for (let i = 0; i < targets.length; i++) {
+    const { label, cam } = targets[i];
+    status.textContent = `撮影中... ${i + 1} / ${targets.length}`;
+
     if (cam.isPerspectiveCamera) { cam.aspect = W / H; cam.updateProjectionMatrix(); }
 
-    // composerがある場合はrenderPassのカメラを切り替えてcomposerでレンダリング
-    if (composer) {
-      renderPass.camera = cam;
-      composer.render();
-    } else {
-      renderer.render(scene, cam);
-    }
+    if (composer) { renderPass.camera = cam; composer.render(); }
+    else { renderer.render(scene, cam); }
 
-    // canvasからPNG取得してダウンロード
+    // canvas → base64（ヘッダ除去してZIPへ）
     const dataUrl = renderer.domElement.toDataURL('image/png');
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = label.replace(/[^\w\-]/g, '_') + '.png';
-    a.click();
-    await new Promise(r => setTimeout(r, 400)); // ダウンロードが重なりすぎないよう少し待つ
+    const base64 = dataUrl.split(',')[1];
+    const filename = label.replace(/[^\w\-]/g, '_') + '.png';
+    zip.file(filename, base64, { base64: true });
+
+    await new Promise(r => setTimeout(r, 50)); // フレームを1回挟む
   }
 
   // 元のカメラに戻す
   if (composer) renderPass.camera = activeCamera;
 
+  status.textContent = 'ZIP生成中...';
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+  const modelName = (document.getElementById('model-name').textContent || 'capture').replace(/\.glb$/i, '').replace(/[^\w\-]/g, '_');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = modelName + '_cameras.zip';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+
   btn.disabled = false;
-  btn.textContent = '📸 全カメラ保存';
+  status.textContent = `✓ ${targets.length}枚を保存しました`;
+  setTimeout(() => { status.style.display = 'none'; }, 3000);
 };
 
 window.resetLighting = function () {
@@ -846,6 +862,8 @@ window.addEventListener('resize', () => {
   renderer.setSize(w, h);
   if (composer) {
     composer.setSize(w, h);
+    composer.renderTarget1?.setSize(w, h);
+    composer.renderTarget2?.setSize(w, h);
     bloomPass.resolution.set(w, h);
     if (smaaPass) smaaPass.setSize(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
   }
