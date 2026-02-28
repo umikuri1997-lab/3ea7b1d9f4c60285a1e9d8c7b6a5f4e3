@@ -324,8 +324,8 @@ dirLight.castShadow = !isMobile;
 if (!isMobile) {
   Object.assign(dirLight.shadow.mapSize, { width: 2048, height: 2048 });
   Object.assign(dirLight.shadow.camera, { near: 0.1, far: 300, left: -60, right: 60, top: 60, bottom: -60 });
-  dirLight.shadow.bias = -0.001;        // -0.0005→-0.001（影のアクネ除去）
-  dirLight.shadow.normalBias = 0.01;    // 0.02→0.01（影エッジを締める）
+  dirLight.shadow.bias = -0.003;        // 光漏れ対策で強めに
+  dirLight.shadow.normalBias = 0.05;    // 壁の隙間からの光漏れを抑制
 }
 scene.add(dirLight);
 
@@ -828,10 +828,21 @@ window.captureAllCameras = async function () {
     const { label, cam } = targets[i];
     status.textContent = `撮影中... ${i + 1} / ${targets.length}`;
 
-    if (cam.isPerspectiveCamera) { cam.aspect = W / H; cam.updateProjectionMatrix(); }
+    if (cam.isPerspectiveCamera) {
+      cam.aspect = W / H;
+      const origFov = cam.fov;
+      cam.fov = /外観|外部/.test(label) ? 64 : 104;
+      cam.updateProjectionMatrix();
 
-    if (composer) { renderPass.camera = cam; composer.render(); }
-    else { renderer.render(scene, cam); }
+      if (composer) { renderPass.camera = cam; composer.render(); }
+      else { renderer.render(scene, cam); }
+
+      cam.fov = origFov; // 元の画角に戻す
+      cam.updateProjectionMatrix();
+    } else {
+      if (composer) { renderPass.camera = cam; composer.render(); }
+      else { renderer.render(scene, cam); }
+    }
 
     const dataUrl = renderer.domElement.toDataURL('image/png');
     const base64 = dataUrl.split(',')[1];
