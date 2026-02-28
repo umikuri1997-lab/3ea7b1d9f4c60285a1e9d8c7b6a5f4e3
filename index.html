@@ -829,28 +829,18 @@ window.captureAllCameras = async function () {
   renderer.setSize(CW, CH);
   if (composer) composer.setSize(CW, CH);
 
-  // 撮影時はリフレクションを強化
-  const captureEnvIntensity = 1.2;
-  if (loadedModel) loadedModel.traverse(o => {
-    if (!o.isMesh) return;
-    (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
-      if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
-        m._origEnvIntensity = m.envMapIntensity;
-        m.envMapIntensity = captureEnvIntensity;
-      }
-    });
-  });
-
   for (let i = 0; i < targets.length; i++) {
     const { label, cam } = targets[i];
-    status.textContent = `撮影中... ${i + 1} / ${targets.length}`;
+    const isOutdoor = /外観|外部/.test(label);
+    const captureFov = isOutdoor ? 64 : 104;
+    status.textContent = `撮影中... ${i + 1} / ${targets.length}  [FOV:${captureFov}]`;
 
     if (cam.isPerspectiveCamera) {
       cam.aspect = W / H;
       const origFov = cam.fov;
-      cam.fov = /外観|外部/.test(label) ? 64 : 104;
+      cam.fov = captureFov;
       cam.updateProjectionMatrix();
-      renderer.render(scene, cam); // composerはdomElementに書かないので直接render
+      renderer.render(scene, cam);
       cam.fov = origFov;
       cam.updateProjectionMatrix();
     } else {
@@ -863,17 +853,6 @@ window.captureAllCameras = async function () {
 
     await new Promise(r => setTimeout(r, 50));
   }
-
-  // リフレクションを元に戻す
-  if (loadedModel) loadedModel.traverse(o => {
-    if (!o.isMesh) return;
-    (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
-      if (m._origEnvIntensity !== undefined) {
-        m.envMapIntensity = m._origEnvIntensity;
-        delete m._origEnvIntensity;
-      }
-    });
-  });
 
   // 元のサイズに戻す
   renderer.setSize(W, H);
