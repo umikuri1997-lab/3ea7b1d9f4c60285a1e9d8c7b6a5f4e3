@@ -324,8 +324,8 @@ dirLight.castShadow = !isMobile;
 if (!isMobile) {
   Object.assign(dirLight.shadow.mapSize, { width: 2048, height: 2048 });
   Object.assign(dirLight.shadow.camera, { near: 0.1, far: 300, left: -60, right: 60, top: 60, bottom: -60 });
-  dirLight.shadow.bias = -0.003;        // 光漏れ対策で強めに
-  dirLight.shadow.normalBias = 0.05;    // 壁の隙間からの光漏れを抑制
+  dirLight.shadow.bias = -0.002;
+  dirLight.shadow.normalBias = 0.03;
 }
 scene.add(dirLight);
 
@@ -792,6 +792,23 @@ window.updateLighting = function () {
   document.getElementById('sv-bloom-th').textContent = bTh.toFixed(2);
 };
 
+/* ── キャプチャ用: canvas を最大サイズに収めてbase64返却 ── */
+function resizeCanvas(srcCanvas, maxSize) {
+  return new Promise(resolve => {
+    let sw = srcCanvas.width, sh = srcCanvas.height;
+    let dw = sw, dh = sh;
+    if (sw > maxSize || sh > maxSize) {
+      const s = maxSize / Math.max(sw, sh);
+      dw = Math.round(sw * s); dh = Math.round(sh * s);
+    }
+    const c = document.createElement('canvas');
+    c.width = dw; c.height = dh;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(srcCanvas, 0, 0, dw, dh);
+    resolve(c.toDataURL('image/png').split(',')[1]);
+  });
+}
+
 /* ── 全カメラ一括キャプチャ → ZIP ── */
 window.captureAllCameras = async function () {
   if (!loadedModel) return;
@@ -833,19 +850,15 @@ window.captureAllCameras = async function () {
       const origFov = cam.fov;
       cam.fov = /外観|外部/.test(label) ? 64 : 104;
       cam.updateProjectionMatrix();
-
-      if (composer) { renderPass.camera = cam; composer.render(); }
-      else { renderer.render(scene, cam); }
-
-      cam.fov = origFov; // 元の画角に戻す
+      renderer.render(scene, cam); // composerはdomElementに書かないので直接render
+      cam.fov = origFov;
       cam.updateProjectionMatrix();
     } else {
-      if (composer) { renderPass.camera = cam; composer.render(); }
-      else { renderer.render(scene, cam); }
+      renderer.render(scene, cam);
     }
 
-    const dataUrl = renderer.domElement.toDataURL('image/png');
-    const base64 = dataUrl.split(',')[1];
+    // 4096上限にリサイズしてbase64化
+    const base64 = await resizeCanvas(renderer.domElement, 4096);
     zip.file(label.replace(/[\/\\:*?"<>|]/g, '_') + '.png', base64, { base64: true });
 
     await new Promise(r => setTimeout(r, 50));
