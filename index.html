@@ -174,7 +174,7 @@
       <div class="slider-row"><label>地面色</label><input type="color" value="#ffffff" id="sl-hemi-gnd" oninput="updateLighting()"><span class="slider-val" id="sv-hemi-gnd">#ffffff</span></div>
       <div class="slider-group-label">▸ マテリアル / ポスプロ</div>
       <div class="slider-row"><label>反射強度</label><input type="range" min="0" max="1" step="0.1" value="0.1" id="sl-envmap" oninput="updateLighting()"><span class="slider-val" id="sv-envmap">0.3</span></div>
-      <div class="slider-row"><label>放射光 強度</label><input type="range" min="0" max="1" step="0.01" value="0.05" id="sl-emissive-mul" oninput="updateLighting()"><span class="slider-val" id="sv-emissive-mul">0.5</span></div>
+      <div class="slider-row"><label>放射光 強度</label><input type="range" min="0" max="1" step="0.01" value="0.2" id="sl-emissive-mul" oninput="updateLighting()"><span class="slider-val" id="sv-emissive-mul">0.2</span></div>
       <div style="padding:4px 16px 12px"><button class="btn secondary" style="width:100%;padding:6px;font-size:10px" onclick="resetLighting()">リセット</button></div>
     </div></div>
     <div class="panel-section"><div class="panel-header" onclick="toggleSection(this)"><span>📸 書き出し</span><span class="arrow">▾</span></div><div class="panel-body" id="export-body">
@@ -320,6 +320,7 @@ scene.add(hemiLight);
 
 /** Emissive由来のSpotLight管理配列 */
 let emissiveLights = [];
+let emissiveLightGroups = []; // {sl, pl, xz: THREE.Vector2}
 
 /* ── HDR Environment ── */
 const rgbeLoader = new RGBELoader();
@@ -456,6 +457,7 @@ function clearEmissiveLights() {
     l.dispose();
   });
   emissiveLights = [];
+  emissiveLightGroups = [];
 }
 
 function loadGLB(url, displayUrl) {
@@ -520,13 +522,15 @@ function loadGLB(url, displayUrl) {
         emissiveLights.push(sl);
 
         // SpotLightから50cm下にPointLight（影なし、固定強度）
-        const pl = new THREE.PointLight(c.color, c.intensity * 0.02, c.distance * 0.8);
+        const pl = new THREE.PointLight(c.color, c.intensity * 0.05, c.distance * 0.8);
         pl.position.set(spotPos.x, spotPos.y - 1.0, spotPos.z);
         pl.castShadow = false;
-        pl.userData.baseIntensity = c.intensity * 0.02;
+        pl.userData.baseIntensity = c.intensity * 0.05;
         pl.userData.isPoint = true;
         scene.add(pl);
         emissiveLights.push(pl);
+        // グループ登録（カメラ近接選択用）
+        emissiveLightGroups.push({ sl, pl, xz: new THREE.Vector2(spotPos.x, spotPos.z) });
       });
       } // end !isMobile SpotLight block
 
@@ -549,6 +553,7 @@ function loadGLB(url, displayUrl) {
       }
       dirLightCenter.copy(center); dirLightDist = maxDim * 2;
       updateLighting();
+      updateNearestLights();
 
       const eyeH = size.y * 0.35 + box.min.y;
       const offset = Math.max(size.x, size.z) * 0.4;
@@ -633,6 +638,7 @@ window.switchCamera = function (idx) {
 
   document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
   document.querySelectorAll('.cam-item').forEach(el => el.classList.toggle('active', parseInt(el.dataset.idx) === idx));
+  updateNearestLights();
 };
 
 /* ── Walk controls ── */
@@ -734,9 +740,22 @@ window.toggleSection = function (h) { h.classList.toggle('open'); h.nextElementS
 const LIGHT_DEFAULTS = {
   exposure: 0.7, dir: 10, dirColor: '#ffffff', dirAzimuth: 45, dirElevation: 60, dirShadow: true, normalBias: 0.03,
   amb: 0.6, ambColor: '#ffffff', hemi: 1.0, hemiSky: '#ffffff', hemiGnd: '#ffffff',
-  envmap: 0.1, emissiveMul: 0.05
+  envmap: 0.1, emissiveMul: 0.2
 };
 let dirLightDist = 50, dirLightCenter = new THREE.Vector3();
+
+/* ── カメラ近接8灯選択 ── */
+function updateNearestLights() {
+  if (!emissiveLightGroups.length) return;
+  const camXZ = new THREE.Vector2(activeCamera.position.x, activeCamera.position.z);
+  const sorted = emissiveLightGroups.slice().sort((a, b) =>
+    a.xz.distanceTo(camXZ) - b.xz.distanceTo(camXZ)
+  );
+  sorted.forEach((g, i) => {
+    g.sl.visible = i < 8;
+    g.pl.visible = i < 8;
+  });
+}
 
 window.updateLighting = function () {
   const v = id => parseFloat(document.getElementById(id).value);
@@ -1038,9 +1057,19 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
 
 /* ── Animation loop ── */
 let lastTime = 0, frameCount = 0;
+const _lastCamXZ = new THREE.Vector2();
+let _nearestDirty = true;
 function animate(time) {
   requestAnimationFrame(animate);
   updateWalk();
+
+  // カメラ移動時にライト近接更新
+  const cx = activeCamera.position.x, cz = activeCamera.position.z;
+  if (_nearestDirty || Math.abs(cx - _lastCamXZ.x) > 0.05 || Math.abs(cz - _lastCamXZ.y) > 0.05) {
+    _lastCamXZ.set(cx, cz);
+    _nearestDirty = false;
+    updateNearestLights();
+  }
 
   if (composer) { renderPass.camera = activeCamera; composer.render(); }
   else { renderer.render(scene, activeCamera); }
