@@ -461,6 +461,7 @@ function disposeModel(obj) {
 function clearEmissiveLights() {
   emissiveLights.forEach(l => {
     scene.remove(l);
+    if (l.target) scene.remove(l.target);
     l.dispose();
   });
   emissiveLights = [];
@@ -514,12 +515,14 @@ function loadGLB(url, displayUrl) {
       });
       ec.sort((a, b) => b.intensity - a.intensity);
       ec.slice(0, 32).forEach(c => {
-        const pl = new THREE.PointLight(c.color, c.intensity, c.distance);
-        pl.position.set(c.pos.x, c.pos.y - 1.0, c.pos.z); // 照明オブジェクトより100cm下
+        const pl = new THREE.SpotLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(60), 0.2);
+        pl.position.set(c.pos.x, c.pos.y - 1.0, c.pos.z);
+        pl.target.position.set(c.pos.x, c.pos.y - 2.0, c.pos.z); // 真下を向く
         pl.castShadow = true;
-        pl.shadow.mapSize.set(512, 512); // PointLightは6面分なので小さめに
+        pl.shadow.mapSize.set(1024, 1024);
         pl.shadow.bias = -0.001;
         pl.userData.baseIntensity = c.intensity;
+        scene.add(pl.target);
         scene.add(pl);
         emissiveLights.push(pl);
       });
