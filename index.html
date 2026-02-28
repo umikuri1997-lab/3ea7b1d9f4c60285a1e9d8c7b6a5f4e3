@@ -165,15 +165,15 @@
       <div class="slider-row"><label>仰角</label><input type="range" min="5" max="90" step="1" value="60" id="sl-dir-elevation" oninput="updateLighting()"><span class="slider-val" id="sv-dir-elevation">60°</span></div>
       <div class="hdr-toggle-row" style="padding:4px 16px 8px"><span class="hdr-toggle-label">影</span><label class="mini-toggle"><input type="checkbox" id="sl-dir-shadow" checked oninput="updateLighting()"><div class="mini-slider"></div></label></div>
       <div class="slider-group-label">▸ 環境光 (Ambient)</div>
-      <div class="slider-row"><label>強度</label><input type="range" min="0" max="5" step="0.01" value="0.4" id="sl-amb" oninput="updateLighting()"><span class="slider-val" id="sv-amb">0.40</span></div>
+      <div class="slider-row"><label>強度</label><input type="range" min="0" max="5" step="0.01" value="0.6" id="sl-amb" oninput="updateLighting()"><span class="slider-val" id="sv-amb">0.60</span></div>
       <div class="slider-row"><label>色</label><input type="color" value="#ffffff" id="sl-amb-color" oninput="updateLighting()"><span class="slider-val" id="sv-amb-color">#fff</span></div>
       <div class="slider-group-label">▸ 半球光 (Hemisphere)</div>
-      <div class="slider-row"><label>強度</label><input type="range" min="0" max="2" step="0.01" value="0.8" id="sl-hemi" oninput="updateLighting()"><span class="slider-val" id="sv-hemi">0.80</span></div>
+      <div class="slider-row"><label>強度</label><input type="range" min="0" max="2" step="0.01" value="1.0" id="sl-hemi" oninput="updateLighting()"><span class="slider-val" id="sv-hemi">1.00</span></div>
       <div class="slider-row"><label>天空色</label><input type="color" value="#ffffff" id="sl-hemi-sky" oninput="updateLighting()"><span class="slider-val" id="sv-hemi-sky">#fff</span></div>
       <div class="slider-row"><label>地面色</label><input type="color" value="#ffffff" id="sl-hemi-gnd" oninput="updateLighting()"><span class="slider-val" id="sv-hemi-gnd">#ffffff</span></div>
       <div class="slider-group-label">▸ マテリアル / ポスプロ</div>
-      <div class="slider-row"><label>反射強度</label><input type="range" min="0" max="4" step="0.1" value="0.3" id="sl-envmap" oninput="updateLighting()"><span class="slider-val" id="sv-envmap">0.3</span></div>
-      <div class="slider-row"><label>放射光 強度</label><input type="range" min="0" max="10" step="0.1" value="0.5" id="sl-emissive-mul" oninput="updateLighting()"><span class="slider-val" id="sv-emissive-mul">0.5</span></div>
+      <div class="slider-row"><label>反射強度</label><input type="range" min="0" max="4" step="0.1" value="0.1" id="sl-envmap" oninput="updateLighting()"><span class="slider-val" id="sv-envmap">0.1</span></div>
+      <div class="slider-row"><label>放射光 強度</label><input type="range" min="0" max="10" step="0.1" value="0.2" id="sl-emissive-mul" oninput="updateLighting()"><span class="slider-val" id="sv-emissive-mul">0.2</span></div>
       <div class="slider-row"><label>Bloom 強度</label><input type="range" min="0" max="0.5" step="0.01" value="0.05" id="sl-bloom-str" oninput="updateLighting()"><span class="slider-val" id="sv-bloom-str">0.05</span></div>
       <div class="slider-row"><label>Bloom 閾値</label><input type="range" min="0" max="1.5" step="0.01" value="0.9" id="sl-bloom-th" oninput="updateLighting()"><span class="slider-val" id="sv-bloom-th">0.90</span></div>
       <div style="padding:4px 16px 12px"><button class="btn secondary" style="width:100%;padding:6px;font-size:10px" onclick="resetLighting()">リセット</button></div>
@@ -252,10 +252,10 @@ if (uploadedDate) {
 /* ── Renderer ── */
 const container = document.getElementById('canvas-container');
 const renderer = new THREE.WebGLRenderer({ antialias: true }); // MSAA常時ON + PC側はSMAAも重ねがけ
-renderer.setPixelRatio(isMobile ? 1.0 : Math.min(window.devicePixelRatio, 1.5));
+renderer.setPixelRatio(isMobile ? 1.0 : Math.min(window.devicePixelRatio, 1.0)); // 1.5→1.0でFPS向上
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = !isMobile;
-if (!isMobile) renderer.shadowMap.type = THREE.PCFShadowMap; // PCFSoft→PCFでエッジをシャープに
+if (!isMobile) renderer.shadowMap.type = THREE.PCFSoftShadowMap; // PCF→PCFSoftに戻して軽量化
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.7;
@@ -322,7 +322,7 @@ const dirLight = new THREE.DirectionalLight(0xffffff, 10);
 dirLight.position.set(15, 30, 15);
 dirLight.castShadow = !isMobile;
 if (!isMobile) {
-  Object.assign(dirLight.shadow.mapSize, { width: 4096, height: 4096 }); // 2048→4096でシャープに
+  Object.assign(dirLight.shadow.mapSize, { width: 2048, height: 2048 });
   Object.assign(dirLight.shadow.camera, { near: 0.1, far: 300, left: -60, right: 60, top: 60, bottom: -60 });
   dirLight.shadow.bias = -0.001;        // -0.0005→-0.001（影のアクネ除去）
   dirLight.shadow.normalBias = 0.01;    // 0.02→0.01（影エッジを締める）
@@ -496,7 +496,7 @@ function loadGLB(url, displayUrl) {
         if (obj.name && /Tree/i.test(obj.name)) mats.forEach(m => { m.side = THREE.DoubleSide; });
         mats.forEach(m => {
           if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
-            m.envMapIntensity = 0.3; m.needsUpdate = true;
+            m.envMapIntensity = 0.1; m.needsUpdate = true;
           }
         });
       });
@@ -739,8 +739,8 @@ window.toggleSection = function (h) { h.classList.toggle('open'); h.nextElementS
 /* ── Lighting controls ── */
 const LIGHT_DEFAULTS = {
   exposure: 0.7, dir: 10, dirColor: '#ffffff', dirAzimuth: 45, dirElevation: 60, dirShadow: true,
-  amb: 0.4, ambColor: '#ffffff', hemi: 0.8, hemiSky: '#ffffff', hemiGnd: '#ffffff',
-  envmap: 0.3, emissiveMul: 0.5, bloomStr: 0.05, bloomTh: 0.9
+  amb: 0.6, ambColor: '#ffffff', hemi: 1.0, hemiSky: '#ffffff', hemiGnd: '#ffffff',
+  envmap: 0.1, emissiveMul: 0.2, bloomStr: 0.05, bloomTh: 0.9
 };
 let dirLightDist = 50, dirLightCenter = new THREE.Vector3();
 
@@ -812,6 +812,18 @@ window.captureAllCameras = async function () {
   renderer.setSize(CW, CH);
   if (composer) composer.setSize(CW, CH);
 
+  // 撮影時はリフレクションを強化
+  const captureEnvIntensity = 1.2;
+  if (loadedModel) loadedModel.traverse(o => {
+    if (!o.isMesh) return;
+    (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+      if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+        m._origEnvIntensity = m.envMapIntensity;
+        m.envMapIntensity = captureEnvIntensity;
+      }
+    });
+  });
+
   for (let i = 0; i < targets.length; i++) {
     const { label, cam } = targets[i];
     status.textContent = `撮影中... ${i + 1} / ${targets.length}`;
@@ -827,6 +839,17 @@ window.captureAllCameras = async function () {
 
     await new Promise(r => setTimeout(r, 50));
   }
+
+  // リフレクションを元に戻す
+  if (loadedModel) loadedModel.traverse(o => {
+    if (!o.isMesh) return;
+    (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+      if (m._origEnvIntensity !== undefined) {
+        m.envMapIntensity = m._origEnvIntensity;
+        delete m._origEnvIntensity;
+      }
+    });
+  });
 
   // 元のサイズに戻す
   renderer.setSize(W, H);
