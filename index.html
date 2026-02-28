@@ -1041,7 +1041,7 @@ let lastTime = 0, frameCount = 0;
 function animate(time) {
   requestAnimationFrame(animate);
   updateWalk();
-  if (vignetteGrainPass) vignetteGrainPass.uniforms['time'].value = time * 0.001;
+
   if (composer) { renderPass.camera = activeCamera; composer.render(); }
   else { renderer.render(scene, activeCamera); }
   updateMeasureLabels();
