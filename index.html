@@ -801,10 +801,16 @@ window.captureAllCameras = async function () {
   status.style.display = 'block';
 
   const W = window.innerWidth, H = window.innerHeight;
+  const SCALE = 4;
+  const CW = W * SCALE, CH = H * SCALE;
   const zip = new JSZip();
 
   // 撮影対象: GLBカメラのみ
   const targets = glbCameras.map((c, i) => ({ label: c.name || ('camera_' + (i + 1)), cam: c }));
+
+  // 4倍解像度に拡大
+  renderer.setSize(CW, CH);
+  if (composer) composer.setSize(CW, CH);
 
   for (let i = 0; i < targets.length; i++) {
     const { label, cam } = targets[i];
@@ -815,16 +821,19 @@ window.captureAllCameras = async function () {
     if (composer) { renderPass.camera = cam; composer.render(); }
     else { renderer.render(scene, cam); }
 
-    // canvas → base64（ヘッダ除去してZIPへ）
     const dataUrl = renderer.domElement.toDataURL('image/png');
     const base64 = dataUrl.split(',')[1];
-    const filename = label.replace(/[^\w\-]/g, '_') + '.png';
-    zip.file(filename, base64, { base64: true });
+    zip.file(label.replace(/[^\w\-]/g, '_') + '.png', base64, { base64: true });
 
-    await new Promise(r => setTimeout(r, 50)); // フレームを1回挟む
+    await new Promise(r => setTimeout(r, 50));
   }
 
-  // 元のカメラに戻す
+  // 元のサイズに戻す
+  renderer.setSize(W, H);
+  if (composer) {
+    composer.setSize(W, H);
+    if (smaaPass) smaaPass.setSize(W * renderer.getPixelRatio(), H * renderer.getPixelRatio());
+  }
   if (composer) renderPass.camera = activeCamera;
 
   status.textContent = 'ZIP生成中...';
@@ -837,8 +846,8 @@ window.captureAllCameras = async function () {
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
 
   btn.disabled = false;
-  status.textContent = `✓ ${targets.length}枚を保存しました`;
-  setTimeout(() => { status.style.display = 'none'; }, 3000);
+  status.textContent = `✓ ${targets.length}枚 (${CW}×${CH}px) を保存しました`;
+  setTimeout(() => { status.style.display = 'none'; }, 4000);
 };
 
 window.resetLighting = function () {
