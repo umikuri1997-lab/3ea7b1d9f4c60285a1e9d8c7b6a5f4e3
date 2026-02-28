@@ -192,7 +192,7 @@
   <div id="measure-hint">計測: 壁・床・天井をクリック → 対面までの距離</div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
 </script>
@@ -514,19 +514,18 @@ function loadGLB(url, displayUrl) {
         }
       });
       ec.sort((a, b) => b.intensity - a.intensity);
-      ec.slice(0, 32).forEach(c => {
+      ec.slice(0, 16).forEach((c, idx) => {
         const pl = new THREE.SpotLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(60), 0.2);
         pl.position.set(c.pos.x, c.pos.y - 1.0, c.pos.z);
-        pl.target.position.set(c.pos.x, c.pos.y - 2.0, c.pos.z); // 真下を向く
-        pl.castShadow = true;
-        pl.shadow.mapSize.set(1024, 1024);
-        pl.shadow.bias = -0.001;
+        pl.target.position.set(c.pos.x, c.pos.y - 2.0, c.pos.z);
+        pl.castShadow = idx < 4; // 上位4灯のみ影あり（テクスチャユニット上限対策）
+        if (pl.castShadow) { pl.shadow.mapSize.set(512, 512); pl.shadow.bias = -0.001; }
         pl.userData.baseIntensity = c.intensity;
         scene.add(pl.target);
         scene.add(pl);
         emissiveLights.push(pl);
       });
-      } // end !isMobile PointLight block
+      } // end !isMobile SpotLight block
 
       // カメラ設定
       setLoading('カメラを設定中...', 90);
