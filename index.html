@@ -835,7 +835,7 @@ window.captureAllCameras = async function () {
 
     const dataUrl = renderer.domElement.toDataURL('image/png');
     const base64 = dataUrl.split(',')[1];
-    zip.file(label.replace(/[^\w\-]/g, '_') + '.png', base64, { base64: true });
+    zip.file(label.replace(/[\/\\:*?"<>|]/g, '_') + '.png', base64, { base64: true });
 
     await new Promise(r => setTimeout(r, 50));
   }
@@ -861,7 +861,7 @@ window.captureAllCameras = async function () {
 
   status.textContent = 'ZIP生成中...';
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
-  const modelName = (document.getElementById('model-name').textContent || 'capture').replace(/\.glb$/i, '').replace(/[^\w\-]/g, '_');
+  const modelName = (document.getElementById('model-name').textContent || 'capture').replace(/\.glb$/i, '').replace(/[\/\\:*?"<>|]/g, '_');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = modelName + '_cameras.zip';
