@@ -515,7 +515,7 @@ function loadGLB(url, displayUrl) {
       ec.sort((a, b) => b.intensity - a.intensity);
       ec.slice(0, 32).forEach(c => {
         const pl = new THREE.PointLight(c.color, c.intensity, c.distance);
-        pl.position.set(c.pos.x, c.pos.y - 0.5, c.pos.z); // 照明オブジェクトより50cm下
+        pl.position.set(c.pos.x, c.pos.y - 0.8, c.pos.z); // 照明オブジェクトより80cm下
         pl.castShadow = false;
         pl.userData.baseIntensity = c.intensity;
         scene.add(pl);
