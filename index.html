@@ -522,15 +522,15 @@ function loadGLB(url, displayUrl) {
         emissiveLights.push(sl);
 
         // SpotLightから50cm下にPointLight（影なし、固定強度）
-        const pl = new THREE.PointLight(c.color, c.intensity * 0.05, c.distance * 0.8);
+        const pl = new THREE.PointLight(c.color, c.intensity * 0.1, c.distance * 0.8);
         pl.position.set(spotPos.x, spotPos.y - 1.0, spotPos.z);
         pl.castShadow = false;
-        pl.userData.baseIntensity = c.intensity * 0.05;
+        pl.userData.baseIntensity = c.intensity * 0.1;
         pl.userData.isPoint = true;
         scene.add(pl);
         emissiveLights.push(pl);
         // グループ登録（カメラ近接選択用）
-        emissiveLightGroups.push({ sl, pl, xz: new THREE.Vector2(spotPos.x, spotPos.z) });
+        emissiveLightGroups.push({ sl, pl, pos3: spotPos.clone() });
       });
       } // end !isMobile SpotLight block
 
@@ -748,10 +748,9 @@ let dirLightDist = 50, dirLightCenter = new THREE.Vector3();
 function updateNearestLights() {
   if (!emissiveLightGroups.length) return;
   const camPos = activeCamera.position;
-  const camXZ = new THREE.Vector2(camPos.x, camPos.z);
-  console.log('[NearestLights] cam=', camPos.x.toFixed(1), camPos.z.toFixed(1), 'groups=', emissiveLightGroups.length);
+  console.log('[NearestLights] cam=', camPos.x.toFixed(1), camPos.y.toFixed(1), camPos.z.toFixed(1), 'groups=', emissiveLightGroups.length);
   const sorted = emissiveLightGroups.slice().sort((a, b) =>
-    a.xz.distanceTo(camXZ) - b.xz.distanceTo(camXZ)
+    a.pos3.distanceTo(camPos) - b.pos3.distanceTo(camPos)
   );
   const emMul = parseFloat(document.getElementById('sl-emissive-mul')?.value || 0.2);
   sorted.forEach((g, i) => {
