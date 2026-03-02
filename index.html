@@ -745,31 +745,18 @@ const LIGHT_DEFAULTS = {
 };
 let dirLightDist = 50, dirLightCenter = new THREE.Vector3();
 
-/* ── カメラ前方優先・近距離順 8灯ON ── */
+/* ── カメラから近い順に8灯ON（円形） ── */
 function updateNearestLights() {
   if (!emissiveLightGroups.length) return;
   const camPos = activeCamera.position;
-  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(activeCamera.quaternion);
-  fwd.y = 0; if (fwd.length() > 0.001) fwd.normalize();
 
-  // 背後（dot < 0）は除外、前方ほど距離を短く見せてスコア計算
-  const scored = emissiveLightGroups.map(g => {
-    const dx = g.pos3.x - camPos.x;
-    const dz = g.pos3.z - camPos.z;
-    const dist = g.pos3.distanceTo(camPos) + 0.001;
-    const horizLen = Math.sqrt(dx * dx + dz * dz);
-    const dot = horizLen > 0.001 ? (dx * fwd.x + dz * fwd.z) / horizLen : 1;
-    if (dot < -0.1) return { g, score: Infinity }; // 真後ろは除外
-    // 前方(dot=1)で距離そのまま、横(dot=0)で1.5倍、やや後ろ(dot=-0.1)で除外
-    const effectiveDist = dist / (dot + 1.1);
-    return { g, score: effectiveDist };
-  });
-  scored.sort((a, b) => a.score - b.score);
+  const sorted = emissiveLightGroups.slice().sort((a, b) =>
+    a.pos3.distanceTo(camPos) - b.pos3.distanceTo(camPos)
+  );
 
-  const activeSet = new Set(scored.slice(0, 8).map(s => s.g));
   const emMul = parseFloat(document.getElementById('sl-emissive-mul')?.value || 0.2);
-  emissiveLightGroups.forEach(g => {
-    const on = activeSet.has(g);
+  sorted.forEach((g, i) => {
+    const on = i < 8;
     g.sl.intensity = on ? g.sl.userData.baseIntensity * emMul : 0;
     g.pl.intensity = on ? g.pl.userData.baseIntensity : 0;
   });
