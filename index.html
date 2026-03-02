@@ -320,7 +320,8 @@ scene.add(hemiLight);
 
 /** Emissive由来のSpotLight管理配列 */
 let emissiveLights = [];
-let emissiveLightGroups = []; // {sl, pl, xz: THREE.Vector2}
+let emissiveLightGroups = []; // { sl, pl, pos3 }
+
 
 /* ── HDR Environment ── */
 const rgbeLoader = new RGBELoader();
@@ -510,10 +511,9 @@ function loadGLB(url, displayUrl) {
         }
       });
       ec.sort((a, b) => b.intensity - a.intensity);
-      ec.slice(0, 16).forEach((c, idx) => {
-        // SpotLightをメッシュ底面の直下に配置
+      ec.forEach((c, idx) => {
         const spotPos = c.pos.clone();
-        spotPos.y = c.boxMinY; // メッシュ底面
+        spotPos.y = c.boxMinY;
         const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(80), 0.2);
         sl.position.copy(spotPos);
         sl.castShadow = !isMobile && idx < 8;
@@ -522,8 +522,17 @@ function loadGLB(url, displayUrl) {
         sl.shadow.mapSize.set(512, 512); sl.shadow.bias = -0.001; sl.shadow.normalBias = parseFloat(document.getElementById('sl-normal-bias')?.value || 0.03);
         scene.add(sl); scene.add(sl.target);
         emissiveLights.push(sl);
-        emissiveLightGroups.push({ sl, pos3: spotPos.clone() });
-        console.log('[Light]', idx, 'pos=', spotPos.x.toFixed(1), spotPos.y.toFixed(1), spotPos.z.toFixed(1), 'intensity=', c.intensity.toFixed(2));
+
+        // SpotLightの50cm下にPointLight
+        const pl = new THREE.PointLight(c.color, 0, c.distance * 0.8);
+        pl.position.set(spotPos.x, spotPos.y - 0.5, spotPos.z);
+        pl.castShadow = false;
+        pl.userData.baseIntensity = 0.02;
+        pl.userData.isPoint = true;
+        scene.add(pl);
+        emissiveLights.push(pl);
+
+        emissiveLightGroups.push({ sl, pl, pos3: spotPos.clone() });
       });
       } // end !isMobile SpotLight block
 
@@ -546,7 +555,6 @@ function loadGLB(url, displayUrl) {
       }
       dirLightCenter.copy(center); dirLightDist = maxDim * 2;
       updateLighting();
-      updateNearestLights();
 
       const eyeH = size.y * 0.35 + box.min.y;
       const offset = Math.max(size.x, size.z) * 0.4;
@@ -737,33 +745,29 @@ const LIGHT_DEFAULTS = {
 };
 let dirLightDist = 50, dirLightCenter = new THREE.Vector3();
 
-/* ── カメラ近接8灯選択 ── */
+/* ── カメラ前方60°・近距離順 8灯ON ── */
 function updateNearestLights() {
   if (!emissiveLightGroups.length) return;
   const camPos = activeCamera.position;
   const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(activeCamera.quaternion);
-  fwd.y = 0; fwd.normalize();
-  const fwdXZ = new THREE.Vector2(fwd.x, fwd.z);
+  fwd.y = 0; if (fwd.length() > 0.001) fwd.normalize();
+  const cos60 = Math.cos(THREE.MathUtils.degToRad(60)); // 前方60°コーン
 
-  const scored = emissiveLightGroups.map(g => {
-    const toLight = g.pos3.clone().sub(camPos);
-    const dist = toLight.length() + 0.001;
-    const toLightXZ = new THREE.Vector2(toLight.x, toLight.z);
-    const dot = toLightXZ.length() > 0.001 ? toLightXZ.normalize().dot(fwdXZ) : 0;
-    const score = (dot + 1.5) / dist;
-    return { g, score };
+  // コーン内に入るものだけ抽出→距離順ソート
+  const inCone = emissiveLightGroups.filter(g => {
+    const toLight = new THREE.Vector3(g.pos3.x - camPos.x, 0, g.pos3.z - camPos.z);
+    if (toLight.length() < 0.001) return true; // 真下は常に含む
+    return toLight.normalize().dot(fwd) >= cos60;
   });
-  scored.sort((a, b) => b.score - a.score);
+  inCone.sort((a, b) => a.pos3.distanceTo(camPos) - b.pos3.distanceTo(camPos));
 
+  const activeSet = new Set(inCone.slice(0, 8).map(g => g));
   const emMul = parseFloat(document.getElementById('sl-emissive-mul')?.value || 0.2);
-  const activeSet = new Set(scored.slice(0, 8).map(s => s.g));
-  let onCount = 0;
   emissiveLightGroups.forEach(g => {
     const on = activeSet.has(g);
     g.sl.intensity = on ? g.sl.userData.baseIntensity * emMul : 0;
-    if (on) onCount++;
+    g.pl.intensity = on ? g.pl.userData.baseIntensity : 0;
   });
-  console.log('[NearestLights] on=', onCount, '/', emissiveLightGroups.length, 'emMul=', emMul.toFixed(2));
 }
 
 window.updateLighting = function () {
@@ -792,11 +796,9 @@ window.updateLighting = function () {
 
   const mul = isMobile ? 0.1 : emMul;
   if (emissiveLightGroups.length) {
-    updateNearestLights();
+    updateNearestLights(); // ON/OFF + intensity をまとめて処理
   } else {
-    emissiveLights.forEach(l => {
-      l.intensity = l.userData.baseIntensity * mul;
-    });
+    emissiveLights.forEach(l => { l.intensity = l.userData.baseIntensity * mul; });
   }
 
   if (loadedModel) loadedModel.traverse(o => {
