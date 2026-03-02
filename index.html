@@ -787,11 +787,11 @@ window.updateLighting = function () {
   hemiLight.intensity = hemi; hemiLight.color.set(hemiSky); hemiLight.groundColor.set(hemiGnd);
 
   const mul = isMobile ? 0.1 : emMul;
-  if (emissiveLightGroups.length) {
-    updateNearestLights(); // ON/OFF + intensity をまとめて処理
-  } else {
-    emissiveLights.forEach(l => { l.intensity = l.userData.baseIntensity * mul; });
-  }
+  const emMul2 = isMobile ? 0.1 : emMul;
+  emissiveLightGroups.forEach(g => {
+    if (g.sl.intensity > 0) g.sl.intensity = g.sl.userData.baseIntensity * emMul2;
+    // plはbaseIntensity固定なので変更不要
+  });
 
   if (loadedModel) loadedModel.traverse(o => {
     if (!o.isMesh) return;
