@@ -634,10 +634,29 @@ window.switchCamera = function (idx) {
     yaw = Math.atan2(-dir.x, -dir.z);
     pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
   }
-  const dv = isMobile ? 3 : (/外観|外部/.test(camName) ? 5 : LIGHT_DEFAULTS.dir);
+  const isOutdoor = /外部|外構/.test(camName);
+  const dv = isMobile ? 3 : (isOutdoor ? 5 : LIGHT_DEFAULTS.dir);
   dirLight.intensity = dv;
   document.getElementById('sl-dir').value = dv;
   document.getElementById('sv-dir').textContent = dv.toFixed(1);
+
+  if (isOutdoor) {
+    // 外部・外構カメラ: 画角60°、ヘミスフィア3
+    walkCamera.fov = 60; walkCamera.updateProjectionMatrix();
+    document.getElementById('sl-fov') && (document.getElementById('sl-fov').value = 60);
+    document.getElementById('sv-fov') && (document.getElementById('sv-fov').textContent = '60°');
+    hemiLight.intensity = 3;
+    document.getElementById('sl-hemi').value = 3;
+    document.getElementById('sv-hemi').textContent = '3.00';
+  } else {
+    // 通常カメラ: デフォルト値
+    walkCamera.fov = LIGHT_DEFAULTS.fov || 90; walkCamera.updateProjectionMatrix();
+    document.getElementById('sl-fov') && (document.getElementById('sl-fov').value = walkCamera.fov);
+    document.getElementById('sv-fov') && (document.getElementById('sv-fov').textContent = walkCamera.fov + '°');
+    hemiLight.intensity = LIGHT_DEFAULTS.hemi;
+    document.getElementById('sl-hemi').value = LIGHT_DEFAULTS.hemi;
+    document.getElementById('sv-hemi').textContent = LIGHT_DEFAULTS.hemi.toFixed(2);
+  }
 
   document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
   document.querySelectorAll('.cam-item').forEach(el => el.classList.toggle('active', parseInt(el.dataset.idx) === idx));
