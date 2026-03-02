@@ -516,23 +516,14 @@ function loadGLB(url, displayUrl) {
         spotPos.y = c.boxMinY; // メッシュ底面
         const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(80), 0.2);
         sl.position.copy(spotPos);
-        sl.castShadow = !isMobile && idx < 8; // 影: 8灯まで
+        sl.castShadow = !isMobile && idx < 8;
         sl.userData.baseIntensity = c.intensity;
         sl.target.position.set(spotPos.x, spotPos.y - 1, spotPos.z);
         sl.shadow.mapSize.set(512, 512); sl.shadow.bias = -0.001; sl.shadow.normalBias = parseFloat(document.getElementById('sl-normal-bias')?.value || 0.03);
         scene.add(sl); scene.add(sl.target);
         emissiveLights.push(sl);
-
-        // SpotLightから50cm下にPointLight（影なし、固定強度）
-        const pl = new THREE.PointLight(c.color, c.intensity * 0.1, c.distance * 0.8);
-        pl.position.set(spotPos.x, spotPos.y - 1.0, spotPos.z);
-        pl.castShadow = false;
-        pl.userData.baseIntensity = c.intensity * 0.1;
-        pl.userData.isPoint = true;
-        scene.add(pl);
-        emissiveLights.push(pl);
-        // グループ登録（カメラ近接選択用）
-        emissiveLightGroups.push({ sl, pl, pos3: spotPos.clone() });
+        emissiveLightGroups.push({ sl, pos3: spotPos.clone() });
+        console.log('[Light]', idx, 'pos=', spotPos.x.toFixed(1), spotPos.y.toFixed(1), spotPos.z.toFixed(1), 'intensity=', c.intensity.toFixed(2));
       });
       } // end !isMobile SpotLight block
 
@@ -764,13 +755,15 @@ function updateNearestLights() {
   });
   scored.sort((a, b) => b.score - a.score);
 
-  const activeSet = new Set(scored.slice(0, 8).map(s => s.g));
   const emMul = parseFloat(document.getElementById('sl-emissive-mul')?.value || 0.2);
+  const activeSet = new Set(scored.slice(0, 8).map(s => s.g));
+  let onCount = 0;
   emissiveLightGroups.forEach(g => {
     const on = activeSet.has(g);
     g.sl.intensity = on ? g.sl.userData.baseIntensity * emMul : 0;
-    g.pl.intensity = on ? g.pl.userData.baseIntensity : 0;
+    if (on) onCount++;
   });
+  console.log('[NearestLights] on=', onCount, '/', emissiveLightGroups.length, 'emMul=', emMul.toFixed(2));
 }
 
 window.updateLighting = function () {
@@ -798,12 +791,10 @@ window.updateLighting = function () {
   hemiLight.intensity = hemi; hemiLight.color.set(hemiSky); hemiLight.groundColor.set(hemiGnd);
 
   const mul = isMobile ? 0.1 : emMul;
-  // emissiveLightGroupsがある場合はupdateNearestLightsに委ねる
   if (emissiveLightGroups.length) {
     updateNearestLights();
   } else {
     emissiveLights.forEach(l => {
-      if (l.userData.isPoint) return;
       l.intensity = l.userData.baseIntensity * mul;
     });
   }
