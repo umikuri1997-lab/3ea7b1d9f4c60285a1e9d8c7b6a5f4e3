@@ -745,23 +745,28 @@ const LIGHT_DEFAULTS = {
 };
 let dirLightDist = 50, dirLightCenter = new THREE.Vector3();
 
-/* ── カメラ前方60°・近距離順 8灯ON ── */
+/* ── カメラ前方優先・近距離順 8灯ON ── */
 function updateNearestLights() {
   if (!emissiveLightGroups.length) return;
   const camPos = activeCamera.position;
   const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(activeCamera.quaternion);
   fwd.y = 0; if (fwd.length() > 0.001) fwd.normalize();
-  const cos60 = Math.cos(THREE.MathUtils.degToRad(60)); // 前方60°コーン
 
-  // コーン内に入るものだけ抽出→距離順ソート
-  const inCone = emissiveLightGroups.filter(g => {
-    const toLight = new THREE.Vector3(g.pos3.x - camPos.x, 0, g.pos3.z - camPos.z);
-    if (toLight.length() < 0.001) return true; // 真下は常に含む
-    return toLight.normalize().dot(fwd) >= cos60;
+  // 背後（dot < 0）は除外、前方ほど距離を短く見せてスコア計算
+  const scored = emissiveLightGroups.map(g => {
+    const dx = g.pos3.x - camPos.x;
+    const dz = g.pos3.z - camPos.z;
+    const dist = g.pos3.distanceTo(camPos) + 0.001;
+    const horizLen = Math.sqrt(dx * dx + dz * dz);
+    const dot = horizLen > 0.001 ? (dx * fwd.x + dz * fwd.z) / horizLen : 1;
+    if (dot < -0.1) return { g, score: Infinity }; // 真後ろは除外
+    // 前方(dot=1)で距離そのまま、横(dot=0)で1.5倍、やや後ろ(dot=-0.1)で除外
+    const effectiveDist = dist / (dot + 1.1);
+    return { g, score: effectiveDist };
   });
-  inCone.sort((a, b) => a.pos3.distanceTo(camPos) - b.pos3.distanceTo(camPos));
+  scored.sort((a, b) => a.score - b.score);
 
-  const activeSet = new Set(inCone.slice(0, 8).map(g => g));
+  const activeSet = new Set(scored.slice(0, 8).map(s => s.g));
   const emMul = parseFloat(document.getElementById('sl-emissive-mul')?.value || 0.2);
   emissiveLightGroups.forEach(g => {
     const on = activeSet.has(g);
