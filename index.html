@@ -504,7 +504,7 @@ function loadGLB(url, displayUrl) {
             const pos = new THREE.Vector3(); obj.getWorldPosition(pos);
             const box3 = new THREE.Box3().setFromObject(obj);
             const sz = box3.getSize(new THREE.Vector3());
-            ec.push({ pos, boxMinY: box3.min.y, color: m.emissive.clone(), intensity: Math.min(m.emissiveIntensity * 0.2, 15), distance: Math.max(Math.max(sz.x, sz.y, sz.z) * 3, 5) });
+            ec.push({ pos, boxMinY: box3.min.y, color: m.emissive.clone(), intensity: Math.min(m.emissiveIntensity, 15), distance: Math.max(Math.max(sz.x, sz.y, sz.z) * 3, 5) });
             break;
           }
         }
@@ -750,13 +750,29 @@ let dirLightDist = 50, dirLightCenter = new THREE.Vector3();
 function updateNearestLights() {
   if (!emissiveLightGroups.length) return;
   const camPos = activeCamera.position;
-  console.log('[NearestLights] cam=', camPos.x.toFixed(1), camPos.y.toFixed(1), camPos.z.toFixed(1), 'groups=', emissiveLightGroups.length);
-  const sorted = emissiveLightGroups.slice().sort((a, b) =>
-    a.pos3.distanceTo(camPos) - b.pos3.distanceTo(camPos)
-  );
+  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(activeCamera.quaternion);
+  fwd.y = 0; fwd.normalize();
+
+  // カメラより上（0.5m以内の下方も許容）のみ対象
+  const candidates = emissiveLightGroups.filter(g => g.pos3.y >= camPos.y - 0.5);
+
+  // 前方・近距離スコアでソート
+  const scored = candidates.map(g => {
+    const toLight = g.pos3.clone().sub(camPos);
+    const dist = toLight.length() + 0.001;
+    const toXZ = new THREE.Vector2(toLight.x, toLight.z).normalize();
+    const fwdXZ = new THREE.Vector2(fwd.x, fwd.z);
+    const dot = toXZ.dot(fwdXZ);
+    const score = (dot + 1.5) / dist;
+    return { g, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+
+  const activeSet = new Set(scored.slice(0, 8).map(s => s.g));
   const emMul = parseFloat(document.getElementById('sl-emissive-mul')?.value || 0.2);
-  sorted.forEach((g, i) => {
-    const on = i < 6;
+
+  emissiveLightGroups.forEach(g => {
+    const on = activeSet.has(g);
     g.sl.intensity = on ? g.sl.userData.baseIntensity * emMul : 0;
     g.pl.intensity = on ? g.pl.userData.baseIntensity : 0;
   });
