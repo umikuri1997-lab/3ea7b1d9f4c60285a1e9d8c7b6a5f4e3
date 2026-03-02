@@ -174,7 +174,8 @@
       <div class="slider-row"><label>地面色</label><input type="color" value="#ffffff" id="sl-hemi-gnd" oninput="updateLighting()"><span class="slider-val" id="sv-hemi-gnd">#ffffff</span></div>
       <div class="slider-group-label">▸ マテリアル / ポスプロ</div>
       <div class="slider-row"><label>反射強度</label><input type="range" min="0" max="1" step="0.1" value="0.1" id="sl-envmap" oninput="updateLighting()"><span class="slider-val" id="sv-envmap">0.3</span></div>
-      <div class="slider-row"><label>放射光 強度</label><input type="range" min="0" max="1" step="0.01" value="0.2" id="sl-emissive-mul" oninput="updateLighting()"><span class="slider-val" id="sv-emissive-mul">0.2</span></div>
+      <div class="slider-row"><label>スポットライト強度</label><input type="range" min="0" max="1" step="0.01" value="0.05" id="sl-emissive-mul" oninput="updateLighting()"><span class="slider-val" id="sv-emissive-mul">0.05</span></div>
+      <div class="slider-row"><label>ポイントライト強度</label><input type="range" min="0" max="0.5" step="0.001" value="0.02" id="sl-point-mul" oninput="updateLighting()"><span class="slider-val" id="sv-point-mul">0.020</span></div>
       <div style="padding:4px 16px 12px"><button class="btn secondary" style="width:100%;padding:6px;font-size:10px" onclick="resetLighting()">リセット</button></div>
     </div></div>
     <div class="panel-section"><div class="panel-header" onclick="toggleSection(this)"><span>📸 書き出し</span><span class="arrow">▾</span></div><div class="panel-body" id="export-body">
@@ -741,7 +742,7 @@ window.toggleSection = function (h) { h.classList.toggle('open'); h.nextElementS
 const LIGHT_DEFAULTS = {
   exposure: 0.7, dir: 10, dirColor: '#ffffff', dirAzimuth: 45, dirElevation: 60, dirShadow: true, normalBias: 0.03,
   amb: 0.6, ambColor: '#ffffff', hemi: 1.0, hemiSky: '#ffffff', hemiGnd: '#ffffff',
-  envmap: 0.1, emissiveMul: 0.2
+  envmap: 0.1, emissiveMul: 0.05
 };
 let dirLightDist = 50, dirLightCenter = new THREE.Vector3();
 
@@ -754,11 +755,12 @@ function updateNearestLights() {
     a.pos3.distanceTo(camPos) - b.pos3.distanceTo(camPos)
   );
 
-  const emMul = parseFloat(document.getElementById('sl-emissive-mul')?.value || 0.2);
+  const emMul = parseFloat(document.getElementById('sl-emissive-mul')?.value || 0.05);
+  const ptMul = parseFloat(document.getElementById('sl-point-mul')?.value || 0.02);
   sorted.forEach((g, i) => {
     const on = i < 8;
     g.sl.intensity = on ? g.sl.userData.baseIntensity * emMul : 0;
-    g.pl.intensity = on ? g.pl.userData.baseIntensity : 0;
+    g.pl.intensity = on ? ptMul : 0;
   });
 }
 
@@ -786,11 +788,13 @@ window.updateLighting = function () {
   ambient.intensity = amb; ambient.color.set(ambColor);
   hemiLight.intensity = hemi; hemiLight.color.set(hemiSky); hemiLight.groundColor.set(hemiGnd);
 
-  const mul = isMobile ? 0.1 : emMul;
   const emMul2 = isMobile ? 0.1 : emMul;
+  const ptMul2 = parseFloat(document.getElementById('sl-point-mul')?.value || 0.02);
   emissiveLightGroups.forEach(g => {
-    if (g.sl.intensity > 0) g.sl.intensity = g.sl.userData.baseIntensity * emMul2;
-    // plはbaseIntensity固定なので変更不要
+    if (g.sl.intensity > 0) {
+      g.sl.intensity = g.sl.userData.baseIntensity * emMul2;
+      g.pl.intensity = ptMul2;
+    }
   });
 
   if (loadedModel) loadedModel.traverse(o => {
@@ -813,7 +817,9 @@ window.updateLighting = function () {
   document.getElementById('sv-hemi-sky').textContent = hemiSky.substring(0, 7);
   document.getElementById('sv-hemi-gnd').textContent = hemiGnd.substring(0, 7);
   document.getElementById('sv-envmap').textContent = env.toFixed(1);
-  document.getElementById('sv-emissive-mul').textContent = emMul.toFixed(1);
+  document.getElementById('sv-emissive-mul').textContent = emMul.toFixed(2);
+  const ptEl = document.getElementById('sv-point-mul');
+  if (ptEl) ptEl.textContent = (parseFloat(document.getElementById('sl-point-mul')?.value || 0.02)).toFixed(3);
 };
 
 
