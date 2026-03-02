@@ -162,7 +162,7 @@
       <div class="slider-row"><label>強度</label><input type="range" min="0" max="20" step="0.1" value="10" id="sl-dir" oninput="updateLighting()"><span class="slider-val" id="sv-dir">10.0</span></div>
       <div class="slider-row"><label>色</label><input type="color" value="#ffffff" id="sl-dir-color" oninput="updateLighting()"><span class="slider-val" id="sv-dir-color">#fff</span></div>
       <div class="slider-row"><label>水平角</label><input type="range" min="0" max="360" step="1" value="45" id="sl-dir-azimuth" oninput="updateLighting()"><span class="slider-val" id="sv-dir-azimuth">45°</span></div>
-      <div class="slider-row"><label>仰角</label><input type="range" min="5" max="90" step="1" value="60" id="sl-dir-elevation" oninput="updateLighting()"><span class="slider-val" id="sv-dir-elevation">60°</span></div>
+      <div class="slider-row"><label>仰角</label><input type="range" min="5" max="90" step="1" value="45" id="sl-dir-elevation" oninput="updateLighting()"><span class="slider-val" id="sv-dir-elevation">45°</span></div>
       <div class="hdr-toggle-row" style="padding:4px 16px 8px"><span class="hdr-toggle-label">影</span><label class="mini-toggle"><input type="checkbox" id="sl-dir-shadow" checked oninput="updateLighting()"><div class="mini-slider"></div></label></div>
       <div class="slider-row"><label>NormalBias</label><input type="range" min="0" max="0.2" step="0.001" value="0.03" id="sl-normal-bias" oninput="updateLighting()"><span class="slider-val" id="sv-normal-bias">0.030</span></div>
       <div class="slider-group-label">▸ 環境光 (Ambient)</div>
@@ -634,7 +634,7 @@ window.switchCamera = function (idx) {
     yaw = Math.atan2(-dir.x, -dir.z);
     pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
   }
-  const isOutdoor = /外部|外構/.test(camName);
+  const isOutdoor = /外部|外構|外観/.test(camName);
   const dv = isMobile ? 3 : (isOutdoor ? 5 : LIGHT_DEFAULTS.dir);
   dirLight.intensity = dv;
   document.getElementById('sl-dir').value = dv;
@@ -760,7 +760,7 @@ window.toggleSection = function (h) { h.classList.toggle('open'); h.nextElementS
 
 /* ── Lighting controls ── */
 const LIGHT_DEFAULTS = {
-  exposure: 0.7, dir: 10, dirColor: '#ffffff', dirAzimuth: 45, dirElevation: 60, dirShadow: true, normalBias: 0.03,
+  exposure: 0.7, dir: 10, dirColor: '#ffffff', dirAzimuth: 45, dirElevation: 45, dirShadow: true, normalBias: 0.03,
   amb: 0.6, ambColor: '#ffffff', hemi: 1.0, hemiSky: '#ffffff', hemiGnd: '#ffffff',
   envmap: 0.1, emissiveMul: 0.2
 };
@@ -874,7 +874,7 @@ window.captureAllCameras = async function () {
 
   for (let i = 0; i < targets.length; i++) {
     const { label, cam } = targets[i];
-    const isOutdoor = /外観|外部/.test(label);
+    const isOutdoor = /外部|外構|外観/.test(label);
     const captureFov = isOutdoor ? 64 : 104;
     status.textContent = `撮影中... ${i + 1} / ${targets.length}  [FOV:${captureFov}]`;
 
