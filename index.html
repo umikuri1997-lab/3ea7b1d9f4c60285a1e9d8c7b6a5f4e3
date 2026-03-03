@@ -127,27 +127,34 @@
   #measure-hint { position:absolute; bottom:60px; left:50%; transform:translateX(-50%); font-family:'DM Mono',monospace; font-size:11px; color:var(--accent-light); background:rgba(22,33,58,0.92); border:1px solid var(--border); padding:6px 18px; border-radius:999px; pointer-events:none; display:none; white-space:nowrap; }
 
   @media (max-width:600px) { :root { --panel-w:240px; } .loading-info-box { padding:10px 14px; } }
-  .kita-logo-name { font-family:'Cormorant Garamond',serif; font-size:36px; font-weight:600; letter-spacing:0.04em; color:#1f3c8c; line-height:1; }
-  .kita-logo-name em { color:#1f3c8c; opacity:0.55; font-style:italic; }
-  .kita-logo-sub { font-family:'DM Mono',monospace; font-size:9px; color:var(--muted); letter-spacing:0.3em; text-transform:uppercase; margin-top:6px; }
-  .kita-logo-divider { width:40px; height:1px; background:linear-gradient(90deg,transparent,rgba(31,60,140,0.5),transparent); margin:10px auto 0; }
 
   /* ── 事前確認オーバーレイ ── */
-  #preload-overlay { position:fixed; inset:0; z-index:9500; background:radial-gradient(ellipse at 50% 0%,#1e3060 0%,#16213a 70%); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:24px; transition:opacity 0.4s; }
+  #preload-overlay { position:fixed; inset:0; z-index:9500; background:radial-gradient(ellipse at 50% 0%,#1e3060 0%,#16213a 70%); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:clamp(8px,2vh,18px); padding:clamp(12px,3vw,24px); transition:opacity 0.4s; }
   #preload-overlay.hidden { opacity:0; pointer-events:none; }
-  .preload-card { background:rgba(31,60,140,0.15); border:1px solid rgba(107,149,232,0.25); border-radius:18px; padding:22px 26px; max-width:400px; width:100%; backdrop-filter:blur(8px); }
-  .preload-card-title { font-family:'Syne',sans-serif; font-size:10px; font-weight:700; letter-spacing:0.2em; color:var(--accent-light); text-transform:uppercase; margin-bottom:12px; }
-  .preload-info-row { display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-family:'DM Mono',monospace; font-size:12px; }
+  .kita-logo-name { font-family:'Cormorant Garamond',serif; font-size:clamp(22px,5vw,36px); font-weight:600; letter-spacing:0.04em; color:#1f3c8c; line-height:1; }
+  .kita-logo-name em { color:#1f3c8c; opacity:0.55; font-style:italic; }
+  .kita-logo-sub { font-family:'DM Mono',monospace; font-size:clamp(8px,1.5vw,9px); color:var(--muted); letter-spacing:0.3em; text-transform:uppercase; margin-top:4px; }
+  .kita-logo-divider { width:40px; height:1px; background:linear-gradient(90deg,transparent,rgba(31,60,140,0.5),transparent); margin:6px auto 0; }
+  .preload-card { background:rgba(31,60,140,0.15); border:1px solid rgba(107,149,232,0.25); border-radius:clamp(10px,2vw,18px); padding:clamp(10px,2vh,22px) clamp(14px,3vw,26px); max-width:400px; width:100%; backdrop-filter:blur(8px); }
+  .preload-card-title { font-family:'Syne',sans-serif; font-size:10px; font-weight:700; letter-spacing:0.2em; color:var(--accent-light); text-transform:uppercase; margin-bottom:clamp(6px,1vh,12px); }
+  .preload-info-row { display:flex; align-items:center; justify-content:space-between; padding:clamp(5px,1vh,9px) 0; border-bottom:1px solid rgba(255,255,255,0.05); font-family:'DM Mono',monospace; font-size:clamp(11px,2vw,12px); }
   .preload-info-row:last-child { border-bottom:none; }
   .preload-info-label { color:var(--muted); }
   .preload-info-val { color:var(--text); font-weight:600; }
-  .wifi-banner { background:rgba(31,60,140,0.18); border:1px solid rgba(107,149,232,0.3); border-radius:14px; padding:12px 16px; display:flex; align-items:flex-start; gap:12px; max-width:400px; width:100%; }
-  .wifi-banner-icon { font-size:20px; flex-shrink:0; margin-top:1px; }
-  .wifi-banner-text { font-family:'DM Mono',monospace; font-size:11px; color:var(--text); line-height:1.7; }
-  .wifi-banner-text b { font-size:12px; display:block; margin-bottom:2px; color:var(--accent-light); }
-  .start-btn { max-width:400px; width:100%; padding:15px; background:linear-gradient(135deg,#2a4fa8 0%,#1f3c8c 100%); border:none; border-radius:999px; color:#e8eeff; font-family:'Syne',sans-serif; font-size:13px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 24px rgba(31,60,140,0.35); }
+  .wifi-banner { background:rgba(31,60,140,0.18); border:1px solid rgba(107,149,232,0.3); border-radius:clamp(10px,2vw,14px); padding:clamp(8px,1.5vh,12px) clamp(12px,2vw,16px); display:flex; align-items:flex-start; gap:10px; max-width:400px; width:100%; }
+  .wifi-banner-icon { font-size:18px; flex-shrink:0; margin-top:1px; }
+  .wifi-banner-text { font-family:'DM Mono',monospace; font-size:clamp(10px,2vw,11px); color:var(--text); line-height:1.6; }
+  .wifi-banner-text b { font-size:clamp(11px,2vw,12px); display:block; margin-bottom:2px; color:var(--accent-light); }
+  .start-btn { max-width:400px; width:100%; padding:clamp(11px,1.8vh,15px); background:linear-gradient(135deg,#2a4fa8 0%,#1f3c8c 100%); border:none; border-radius:999px; color:#e8eeff; font-family:'Syne',sans-serif; font-size:clamp(11px,2vw,13px); font-weight:800; letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 24px rgba(31,60,140,0.35); }
   .start-btn:hover { box-shadow:0 6px 32px rgba(31,60,140,0.5); transform:translateY(-1px); opacity:0.92; }
-  .preload-disclaimer { font-family:'DM Mono',monospace; font-size:11px; color:var(--text); text-align:center; line-height:1.7; max-width:360px; }
+  .preload-disclaimer { font-family:'DM Mono',monospace; font-size:clamp(9px,1.8vw,11px); color:var(--text); text-align:center; line-height:1.6; max-width:360px; }
+
+  /* 極端に縦が小さい場合（横向きスマホ等）はさらに要素を間引く */
+  @media (max-height: 480px) {
+    .kita-logo-divider, .kita-logo-sub { display:none; }
+    .preload-card-title { display:none; }
+    #preload-overlay { gap:6px; }
+  }
 
   #rotate-msg { display:none; position:fixed; inset:0; z-index:9999; background:radial-gradient(ellipse at 50% 0%,#1e3060 0%,#16213a 70%); flex-direction:column; align-items:center; justify-content:center; gap:12px; color:var(--text); font-family:'Syne',sans-serif; }
   #rotate-msg .rotate-icon { font-size:48px; animation:rotateHint 2s ease-in-out infinite; }
