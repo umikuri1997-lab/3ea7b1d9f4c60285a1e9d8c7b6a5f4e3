@@ -734,6 +734,7 @@ window.switchCamera = function (idx) {
 
   document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
   document.querySelectorAll('.cam-item').forEach(el => el.classList.toggle('active', parseInt(el.dataset.idx) === idx));
+  updateLighting();
   updateNearestLights();
 };
 
