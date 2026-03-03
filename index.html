@@ -643,8 +643,9 @@ function loadGLB(url, displayUrl) {
       const parts = (displayUrl || url).split('/');
       document.getElementById('model-name').textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb');
       document.getElementById('btn-capture').disabled = false;
-      activeCamera = walkCamera; activeCamIdx = -1;
+      // 常にカメラ一覧の先頭を選択
       if (glbCameras.length > 0) switchCamera(0);
+      else { activeCamera = walkCamera; activeCamIdx = -1; }
     },
     (prog) => {
       if (prog.total > 0) {
@@ -667,12 +668,6 @@ function loadGLB(url, displayUrl) {
 function buildCameraList() {
   const list = document.getElementById('camera-list');
   list.innerHTML = '';
-
-  const walkItem = document.createElement('div');
-  walkItem.className = 'cam-item active'; walkItem.dataset.idx = '-1';
-  walkItem.innerHTML = '<div class="cam-icon">🚶</div><div class="cam-label">ウォークスルー</div>';
-  walkItem.onclick = () => switchCamera(-1);
-  list.appendChild(walkItem);
 
   if (!glbCameras.length) {
     const n = document.createElement('div');
@@ -705,7 +700,7 @@ window.switchCamera = function (idx) {
     yaw = Math.atan2(-dir.x, -dir.z);
     pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
     // カメラの水平方向からディレクショナルライト角度を算出（度数法）
-    camYaw = ((yaw * 180 / Math.PI) % 360 + 360) % 360;
+    camYaw = ((yaw * 180 / Math.PI + 30) % 360 + 360) % 360;
   }
   const isOutdoor = /外部|外構|外観/.test(camName);
   const dv = isMobile ? 3 : (isOutdoor ? 5 : LIGHT_DEFAULTS.dir);
