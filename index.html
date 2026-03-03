@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GLB Walkthrough Viewer</title>
+<title>喜多ハウジング ウォークスルービューア</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230a0a0b'/><path d='M6 22 L11 10 L16 18 L19 13 L26 22Z' fill='%23c8ff00' opacity='0.9'/><circle cx='22' cy='10' r='3' fill='%23c8ff00' opacity='0.6'/></svg>">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap');
@@ -67,7 +67,7 @@
   .hint-key { display:inline-block; background:var(--border); padding:1px 5px; font-size:9px; color:var(--text); }
 
   /* Loading */
-  #loading-overlay { position:fixed; inset:0; z-index:9000; background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; transition:opacity 0.4s; padding:20px; }
+  #loading-overlay { position:fixed; inset:0; z-index:9000; background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; transition:opacity 0.4s; padding:20px; opacity:0; pointer-events:none; }
   #loading-overlay.hidden { opacity:0; pointer-events:none; }
   .loading-spinner { width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
@@ -121,6 +121,28 @@
   #measure-hint { position:absolute; bottom:60px; left:50%; transform:translateX(-50%); font-family:'DM Mono',monospace; font-size:11px; color:var(--accent); background:rgba(10,10,11,0.85); border:1px solid var(--border); padding:6px 14px; border-radius:6px; pointer-events:none; display:none; white-space:nowrap; }
 
   @media (max-width:600px) { :root { --panel-w:240px; } .loading-info-box { padding:10px 14px; } }
+  /* ── 喜多ハウジング ブランドロゴ ── */
+  .kita-logo-name { font-size:22px; font-weight:800; letter-spacing:0.06em; color:var(--text); }
+  .kita-logo-name em { color:var(--accent); font-style:normal; }
+  .kita-logo-sub { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:0.25em; text-transform:uppercase; margin-top:2px; }
+
+  /* ── 事前確認オーバーレイ ── */
+  #preload-overlay { position:fixed; inset:0; z-index:9500; background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:24px; transition:opacity 0.4s; }
+  #preload-overlay.hidden { opacity:0; pointer-events:none; }
+  .preload-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:22px 26px; max-width:400px; width:100%; }
+  .preload-card-title { font-family:'DM Mono',monospace; font-size:10px; font-weight:700; letter-spacing:0.18em; color:var(--accent); text-transform:uppercase; margin-bottom:12px; }
+  .preload-info-row { display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border); font-family:'DM Mono',monospace; font-size:12px; }
+  .preload-info-row:last-child { border-bottom:none; }
+  .preload-info-label { color:var(--muted); }
+  .preload-info-val { color:var(--text); font-weight:500; }
+  .wifi-banner { background:rgba(200,255,0,0.07); border:1px solid rgba(200,255,0,0.25); border-radius:8px; padding:12px 16px; display:flex; align-items:flex-start; gap:12px; max-width:400px; width:100%; }
+  .wifi-banner-icon { font-size:22px; flex-shrink:0; margin-top:1px; }
+  .wifi-banner-text { font-family:'DM Mono',monospace; font-size:11px; color:var(--accent); line-height:1.7; }
+  .wifi-banner-text b { font-size:12px; display:block; margin-bottom:2px; }
+  .start-btn { max-width:400px; width:100%; padding:14px; background:var(--accent); border:none; border-radius:8px; color:#0a0a0b; font-family:'Syne',sans-serif; font-size:14px; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; cursor:pointer; transition:opacity 0.15s; }
+  .start-btn:hover { opacity:0.85; }
+  .preload-disclaimer { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); text-align:center; line-height:1.6; max-width:360px; }
+
   #rotate-msg { display:none; position:fixed; inset:0; z-index:9999; background:var(--bg); flex-direction:column; align-items:center; justify-content:center; gap:12px; color:var(--text); font-family:'Syne',sans-serif; }
   #rotate-msg .rotate-icon { font-size:48px; animation:rotateHint 2s ease-in-out infinite; }
   #rotate-msg .rotate-text { font-size:14px; color:var(--muted); }
@@ -131,6 +153,41 @@
 <body>
 <div id="canvas-container"></div>
 <div id="rotate-msg"><div class="rotate-icon">📱</div><div class="rotate-text">横向きにしてください</div></div>
+
+<div id="preload-overlay">
+  <!-- 喜多ハウジング ロゴ -->
+  <div style="text-align:center;margin-bottom:4px;">
+    <div style="font-size:38px;margin-bottom:6px;">🏠</div>
+    <div class="kita-logo-name">喜多<em>ハウジング</em></div>
+    <div class="kita-logo-sub">Walk-Through Viewer</div>
+  </div>
+
+  <!-- ファイル情報カード -->
+  <div class="preload-card">
+    <div class="preload-card-title">📦 データ情報</div>
+    <div class="preload-info-row">
+      <span class="preload-info-label">ファイルサイズ</span>
+      <span class="preload-info-val" id="preload-size">取得中...</span>
+    </div>
+    <div class="preload-info-row">
+      <span class="preload-info-label">形式</span>
+      <span class="preload-info-val">3D ウォークスルー (GLB)</span>
+    </div>
+  </div>
+
+  <!-- WiFi推奨バナー -->
+  <div class="wifi-banner">
+    <div class="wifi-banner-icon">📶</div>
+    <div class="wifi-banner-text">
+      <b>Wi-Fi のご利用を推奨します</b>
+      データサイズが大きいため、モバイル回線ではダウンロードに時間がかかる場合があります。
+    </div>
+  </div>
+
+  <button class="start-btn" id="preload-start-btn" onclick="startWalkthrough()">ウォークスルーを開始 →</button>
+
+  <div class="preload-disclaimer">※ 3Dソフトの表現上、実際の施工・仕上がりとは異なる箇所がございます。</div>
+</div>
 
 <div id="loading-overlay">
   <div class="loading-spinner" id="loading-spinner"></div>
@@ -150,7 +207,7 @@
 </div>
 
 <div id="ui">
-  <div id="topbar"><div id="logo">Walk<span style="color:var(--text)">View</span></div><div id="model-name"></div></div>
+  <div id="topbar"><div id="logo" style="display:flex;flex-direction:column;line-height:1.1;"><span style="font-size:14px;font-weight:800;letter-spacing:0.06em;color:var(--text)">喜多<span style="color:var(--accent)">ハウジング</span></span><span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:0.2em;font-weight:400">WALK VIEW</span></div><div id="model-name"></div></div>
   <button id="panel-toggle" onclick="togglePanel()">☰</button>
   <div id="panel-left">
     <div class="panel-section"><div class="panel-header open" onclick="toggleSection(this)"><span>📷 カメラ</span><span class="arrow">▾</span></div><div class="panel-body open" id="camera-list"><div style="padding:16px 20px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">GLBを読み込むと表示</div></div></div>
@@ -463,6 +520,12 @@ function clearEmissiveLights() {
 }
 
 function loadGLB(url, displayUrl) {
+  // ローディングオーバーレイを表示
+  const ov = document.getElementById('loading-overlay');
+  ov.style.opacity = '';
+  ov.style.pointerEvents = '';
+  ov.classList.remove('hidden');
+
   setLoading('GLBデータをダウンロード中...', 5);
   startSlowTimer();
 
@@ -1103,8 +1166,36 @@ function animate(time) {
 buildHDRPanel();
 animate(0);
 
-if (autoGlb) { loadGLB(autoGlb, autoGlb); }
-else { setLoading('', 0); showError('アップローダーからQRコード / URLでアクセスしてください'); }
+if (autoGlb) {
+  // ファイルサイズをHEADリクエストで取得
+  (async () => {
+    try {
+      const res = await fetch(autoGlb, { method: 'HEAD' });
+      const bytes = parseInt(res.headers.get('content-length') || '0', 10);
+      const sizeEl = document.getElementById('preload-size');
+      if (bytes > 0) {
+        const mb = bytes / 1024 / 1024;
+        sizeEl.textContent = mb >= 1000
+          ? (mb / 1024).toFixed(2) + ' GB'
+          : mb.toFixed(1) + ' MB';
+      } else {
+        sizeEl.textContent = '不明';
+      }
+    } catch (e) {
+      document.getElementById('preload-size').textContent = '不明';
+    }
+  })();
+
+  window.startWalkthrough = function () {
+    document.getElementById('preload-overlay').classList.add('hidden');
+    loadGLB(autoGlb, autoGlb);
+  };
+}
+else {
+  document.getElementById('preload-overlay').classList.add('hidden');
+  setLoading('', 0);
+  showError('アップローダーからQRコード / URLでアクセスしてください');
+}
 </script>
 </body>
 </html>
