@@ -304,16 +304,7 @@ async function refreshStorage() {
   document.getElementById('storage-detail').style.display = 'none';
 
   try {
-    // バケット情報取得（ファイルサイズ上限チェック）
-    try {
-      const bucketRes = await fetch(sbUrl + '/storage/v1/bucket/' + sbBucket, { headers: sbHeaders(sbKey) });
-      if (bucketRes.ok) {
-        const info = await bucketRes.json();
-        bucketFileSizeLimit = info.file_size_limit || 0;
-        document.getElementById('storage-size-warn').style.display =
-          (bucketFileSizeLimit > 0 && bucketFileSizeLimit <= 52428800) ? 'block' : 'none';
-      }
-    } catch (e) { /* bucket info is optional */ }
+    // バケット情報取得はservice_role keyが必要なため省略（anon keyでは400エラーになる）
 
     // ファイル一覧取得（ページネーション対応）
     let allFiles = [];
@@ -415,6 +406,120 @@ function toSafe(name) {
 /* ============================================================
    GLB Processing: Light removal
    ============================================================ */
+
+/** GLBマテリアルのemissive強度を全件 +offset する */
+async function boostEmissive(buf, offset) {
+  const view = new DataView(buf);
+  if (view.getUint32(0, true) !== 0x46546C67) throw new Error('GLBではありません');
+  const version = view.getUint32(4, true);
+
+  let off = 12, jsonOff = -1, jsonLen = 0, binOff = -1, binLen = 0;
+  while (off < buf.byteLength) {
+    const chunkLen = view.getUint32(off, true);
+    const chunkType = view.getUint32(off + 4, true);
+    if (chunkType === 0x4E4F534A) { jsonOff = off + 8; jsonLen = chunkLen; }
+    else if (chunkType === 0x004E4942) { binOff = off; binLen = chunkLen; }
+    off += 8 + chunkLen;
+  }
+  if (jsonOff < 0) throw new Error('JSONチャンクなし');
+
+  const gltf = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, jsonOff, jsonLen)));
+  let count = 0;
+
+  (gltf.materials || []).forEach(mat => {
+    // emissiveFactor [R,G,B] を +offset（上限1.0）
+    if (mat.emissiveFactor) {
+      mat.emissiveFactor = mat.emissiveFactor.map(v => Math.min(1.0, v + offset));
+      count++;
+    } else {
+      // emissiveFactor未設定でも KHR_materials_emissive_strength があれば加算
+    }
+    // KHR_materials_emissive_strength の strength を +offset
+    const ext = mat.extensions?.KHR_materials_emissive_strength;
+    if (ext != null) {
+      ext.emissiveStrength = (ext.emissiveStrength || 1.0) + offset;
+      count++;
+    }
+  });
+
+  // GLBを再構築
+  let jsonStr = JSON.stringify(gltf);
+  while (jsonStr.length % 4) jsonStr += ' ';
+  const jsonBytes = new TextEncoder().encode(jsonStr);
+  const total = 12 + 8 + jsonBytes.length + (binOff >= 0 ? 8 + binLen : 0);
+  const out = new ArrayBuffer(total);
+  const outView = new DataView(out);
+  const outArr = new Uint8Array(out);
+
+  outView.setUint32(0, 0x46546C67, true);
+  outView.setUint32(4, version, true);
+  outView.setUint32(8, total, true);
+  outView.setUint32(12, jsonBytes.length, true);
+  outView.setUint32(16, 0x4E4F534A, true);
+  outArr.set(jsonBytes, 20);
+
+  if (binOff >= 0) {
+    const bs = 20 + jsonBytes.length;
+    outView.setUint32(bs, binLen, true);
+    outView.setUint32(bs + 4, 0x004E4942, true);
+    outArr.set(new Uint8Array(buf, binOff + 8, binLen), bs + 8);
+  }
+
+  return { buffer: out, count };
+}
+
+/** GLBマテリアル全件にKHR_materials_sheenを追加 */
+async function addSheen(buf) {
+  const view = new DataView(buf);
+  if (view.getUint32(0, true) !== 0x46546C67) throw new Error('GLBではありません');
+  const version = view.getUint32(4, true);
+
+  let off = 12, jsonOff = -1, jsonLen = 0, binOff = -1, binLen = 0;
+  while (off < buf.byteLength) {
+    const chunkLen = view.getUint32(off, true);
+    const chunkType = view.getUint32(off + 4, true);
+    if (chunkType === 0x4E4F534A) { jsonOff = off + 8; jsonLen = chunkLen; }
+    else if (chunkType === 0x004E4942) { binOff = off; binLen = chunkLen; }
+    off += 8 + chunkLen;
+  }
+  if (jsonOff < 0) throw new Error('JSONチャンクなし');
+
+  const gltf = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, jsonOff, jsonLen)));
+
+  // 既存のsheenColorFactorに +0.5（なければスキップ）
+  (gltf.materials || []).forEach(mat => {
+    const sheen = mat.extensions?.KHR_materials_sheen;
+    if (!sheen) return;
+    // sheenColorFactorがなければ[0,0,0]として扱い +0.5
+    const base = sheen.sheenColorFactor || [0, 0, 0];
+    sheen.sheenColorFactor = base.map(v => Math.min(1.0, v + 0.5));
+  });
+
+  // GLBを再構築
+  let jsonStr = JSON.stringify(gltf);
+  while (jsonStr.length % 4) jsonStr += ' ';
+  const jsonBytes = new TextEncoder().encode(jsonStr);
+  const total = 12 + 8 + jsonBytes.length + (binOff >= 0 ? 8 + binLen : 0);
+  const out = new ArrayBuffer(total);
+  const outView = new DataView(out);
+  const outArr = new Uint8Array(out);
+
+  outView.setUint32(0, 0x46546C67, true);
+  outView.setUint32(4, version, true);
+  outView.setUint32(8, total, true);
+  outView.setUint32(12, jsonBytes.length, true);
+  outView.setUint32(16, 0x4E4F534A, true);
+  outArr.set(jsonBytes, 20);
+
+  if (binOff >= 0) {
+    const bs = 20 + jsonBytes.length;
+    outView.setUint32(bs, binLen, true);
+    outView.setUint32(bs + 4, 0x004E4942, true);
+    outArr.set(new Uint8Array(buf, binOff + 8, binLen), bs + 8);
+  }
+
+  return { buffer: out, count: (gltf.materials || []).length };
+}
 
 /** GLBバイナリからKHR_lights_punctualを除去 */
 async function removeLights(buf) {
@@ -827,7 +932,17 @@ async function uploadAll() {
       }
       setPb(item.id, 20);
 
-      // ② テクスチャ圧縮（元バイナリレイアウトのまま処理）
+      // ② Sheenを全マテリアルに追加
+      try {
+        setSt(item.id, 'processing', 'Sheen設定中...');
+        const r = await addSheen(buf);
+        buf = r.buffer;
+        addLog('  sheen追加 (' + r.count + ' マテリアル)', 'ok');
+      } catch (e) {
+        addLog('  Sheen設定エラー: ' + e.message, 'err');
+      }
+
+      // ③ テクスチャ圧縮（元バイナリレイアウトのまま処理）
       if (doCompress) {
         try {
           setSt(item.id, 'processing', '圧縮中...');
