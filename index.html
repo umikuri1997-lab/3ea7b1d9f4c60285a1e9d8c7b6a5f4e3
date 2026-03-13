@@ -380,7 +380,7 @@ const dirLight = new THREE.DirectionalLight(0xffffff, 10);
 dirLight.position.set(15, 30, 15);
 dirLight.castShadow = !isMobile;
 if (!isMobile) {
-  Object.assign(dirLight.shadow.mapSize, { width: 2048, height: 2048 });
+  Object.assign(dirLight.shadow.mapSize, { width: 4096, height: 4096 });
   Object.assign(dirLight.shadow.camera, { near: 0.1, far: 300, left: -60, right: 60, top: 60, bottom: -60 });
   dirLight.shadow.bias = -0.001;
   dirLight.shadow.normalBias = 0.02;
@@ -597,7 +597,7 @@ function loadGLB(url, displayUrl) {
         sl.castShadow = !isMobile && idx < 8;
         sl.userData.baseIntensity = c.intensity;
         sl.target.position.set(spotPos.x, spotPos.y - 1, spotPos.z);
-        sl.shadow.mapSize.set(512, 512); sl.shadow.bias = -0.001; sl.shadow.normalBias = parseFloat(document.getElementById('sl-normal-bias')?.value || 0.03);
+        sl.shadow.mapSize.set(1024, 1024); sl.shadow.bias = -0.001; sl.shadow.normalBias = parseFloat(document.getElementById('sl-normal-bias')?.value || 0.03);
         scene.add(sl); scene.add(sl.target);
         emissiveLights.push(sl);
 
