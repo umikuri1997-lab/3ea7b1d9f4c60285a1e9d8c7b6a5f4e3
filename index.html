@@ -248,24 +248,7 @@
       <div class="slider-row"><label>ポイントライト強度</label><input type="range" min="0" max="0.5" step="0.001" value="0.15" id="sl-point-mul" oninput="updateLighting()"><span class="slider-val" id="sv-point-mul">0.150</span></div>
       <div style="padding:4px 16px 12px"><button class="btn secondary" style="width:100%;padding:6px;font-size:10px" onclick="resetLighting()">リセット</button></div>
     </div></div>
-    <div class="panel-section" id="mat-section"><div class="panel-header" onclick="toggleSection(this)"><span>🎨 マテリアル調整</span><span class="arrow">▾</span></div><div class="panel-body" id="mat-body">
-      <div id="mat-hint" style="padding:8px 16px 4px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">GLB読み込み後に有効</div>
-      <div class="slider-group-label">▸ 表面プロパティ（全マテリアル共通オフセット）</div>
-      <div class="slider-row"><label>粗さ ±</label><input type="range" min="-1" max="1" step="0.01" value="0" id="sl-mat-rough" oninput="applyMaterialOffsets()"><span class="slider-val" id="sv-mat-rough">+0.00</span></div>
-      <div class="slider-row"><label>金属感 ±</label><input type="range" min="-1" max="1" step="0.01" value="0" id="sl-mat-metal" oninput="applyMaterialOffsets()"><span class="slider-val" id="sv-mat-metal">+0.00</span></div>
-      <div class="slider-group-label">▸ 発光</div>
-      <div class="slider-row"><label>発光強度 ±</label><input type="range" min="-10" max="10" step="0.1" value="0" id="sl-mat-emissive" oninput="applyMaterialOffsets()"><span class="slider-val" id="sv-mat-emissive">+0.0</span></div>
-      <div class="slider-group-label">▸ 透明度</div>
-      <div class="slider-row"><label>透明度 ±</label><input type="range" min="-1" max="1" step="0.01" value="0" id="sl-mat-opacity" oninput="applyMaterialOffsets()"><span class="slider-val" id="sv-mat-opacity">+0.00</span></div>
-      <div class="slider-group-label">▸ MeshPhysicalMaterial 専用</div>
-      <div class="slider-row"><label>クリアコート ±</label><input type="range" min="-1" max="1" step="0.01" value="0" id="sl-mat-clearcoat" oninput="applyMaterialOffsets()"><span class="slider-val" id="sv-mat-clearcoat">+0.00</span></div>
-      <div class="slider-row"><label>CCラフネス ±</label><input type="range" min="-1" max="1" step="0.01" value="0" id="sl-mat-ccrough" oninput="applyMaterialOffsets()"><span class="slider-val" id="sv-mat-ccrough">+0.00</span></div>
-      <div class="slider-row"><label>透過率 ±</label><input type="range" min="-1" max="1" step="0.01" value="0" id="sl-mat-transmission" oninput="applyMaterialOffsets()"><span class="slider-val" id="sv-mat-transmission">+0.00</span></div>
-      <div class="slider-row"><label>IOR ±</label><input type="range" min="-1.333" max="1.333" step="0.01" value="0" id="sl-mat-ior" oninput="applyMaterialOffsets()"><span class="slider-val" id="sv-mat-ior">+0.00</span></div>
-      <div class="slider-row"><label>シーン ±</label><input type="range" min="-1" max="1" step="0.01" value="0" id="sl-mat-sheen" oninput="applyMaterialOffsets()"><span class="slider-val" id="sv-mat-sheen">+0.00</span></div>
-      <div class="slider-row"><label>虹彩 ±</label><input type="range" min="-1" max="1" step="0.01" value="0" id="sl-mat-iridescence" oninput="applyMaterialOffsets()"><span class="slider-val" id="sv-mat-iridescence">+0.00</span></div>
-      <div style="padding:4px 16px 12px"><button class="btn secondary" style="width:100%;padding:6px;font-size:10px" onclick="resetMaterialOffsets()">リセット</button></div>
-    </div></div>
+
     <div class="panel-section"><div class="panel-header" onclick="toggleSection(this)"><span>📸 書き出し</span><span class="arrow">▾</span></div><div class="panel-body" id="export-body">
       <div style="padding:12px 16px 14px">
         <button id="btn-capture" class="btn" style="width:100%;padding:9px;font-size:12px" onclick="captureAllCameras()" disabled>全カメラをZIPで保存</button>
@@ -1033,6 +1016,7 @@ window.resetLighting = function () {
 /* ── Material property offsets ── */
 let materialOriginals = []; // { mat, roughness, metalness, emissiveIntensity, opacity }
 
+/* ── マテリアル調整（固定値: 粗さ-0.3 / 金属度+0.3 / 虹彩+0.1） ── */
 function saveMaterialOriginals() {
   materialOriginals = [];
   if (!loadedModel) return;
@@ -1048,93 +1032,24 @@ function saveMaterialOriginals() {
           mat: m,
           roughness: m.roughness ?? 0.5,
           metalness: m.metalness ?? 0,
-          emissiveIntensity: m.emissiveIntensity ?? 1,
-          opacity: m.opacity ?? 1,
-          originalTransparent: m.transparent,
-          // MeshPhysicalMaterial専用（StandardMaterialには存在しないので ?? 0 でフォールバック）
           isPhysical: !!m.isMeshPhysicalMaterial,
-          clearcoat: m.clearcoat ?? 0,
-          clearcoatRoughness: m.clearcoatRoughness ?? 0,
-          transmission: m.transmission ?? 0,
-          ior: m.ior ?? 1.5,
-          sheen: m.sheen ?? 0,
           iridescence: m.iridescence ?? 0,
         });
       }
     });
   });
-  const hint = document.getElementById('mat-hint');
-  if (hint) {
-    const physCount = materialOriginals.filter(o => o.isPhysical).length;
-    hint.textContent = materialOriginals.length + ' マテリアル検出（うち Physical: ' + physCount + '）';
-  }
 }
 
 window.applyMaterialOffsets = function() {
-  const roughDelta        = parseFloat(document.getElementById('sl-mat-rough').value);
-  const metalDelta        = parseFloat(document.getElementById('sl-mat-metal').value);
-  const emDelta           = parseFloat(document.getElementById('sl-mat-emissive').value);
-  const opacityDelta      = parseFloat(document.getElementById('sl-mat-opacity').value);
-  const clearcoatDelta    = parseFloat(document.getElementById('sl-mat-clearcoat').value);
-  const ccRoughDelta      = parseFloat(document.getElementById('sl-mat-ccrough').value);
-  const transmissionDelta = parseFloat(document.getElementById('sl-mat-transmission').value);
-  const iorDelta          = parseFloat(document.getElementById('sl-mat-ior').value);
-  const sheenDelta        = parseFloat(document.getElementById('sl-mat-sheen').value);
-  const iridescenceDelta  = parseFloat(document.getElementById('sl-mat-iridescence').value);
-
-  materialOriginals.forEach(o => {
-    const { mat, roughness, metalness, emissiveIntensity, opacity, originalTransparent,
-            isPhysical, clearcoat, clearcoatRoughness, transmission, ior, sheen, iridescence } = o;
-
-    mat.roughness = Math.max(0, Math.min(1, roughness + roughDelta));
-    mat.metalness = Math.max(0, Math.min(1, metalness + metalDelta));
-    mat.emissiveIntensity = Math.max(0, emissiveIntensity + emDelta);
-    const newOpacity = Math.max(0, Math.min(1, opacity + opacityDelta));
-    mat.opacity = newOpacity;
-    mat.transparent = (newOpacity < 1) || originalTransparent;
-
-    if (isPhysical) {
-      mat.clearcoat           = Math.max(0, Math.min(1, clearcoat + clearcoatDelta));
-      mat.clearcoatRoughness  = Math.max(0, Math.min(1, clearcoatRoughness + ccRoughDelta));
-      const newTrans = Math.max(0, Math.min(1, transmission + transmissionDelta));
-      mat.transmission = newTrans;
-      if (newTrans > 0) mat.transparent = true;
-      mat.ior = Math.max(1, Math.min(2.333, ior + iorDelta));
-      mat.sheen = Math.max(0, Math.min(1, sheen + sheenDelta));
-      mat.iridescence = Math.max(0, Math.min(1, iridescence + iridescenceDelta));
-    }
-
+  materialOriginals.forEach(({ mat, roughness, metalness, isPhysical, iridescence }) => {
+    mat.roughness = Math.max(0, Math.min(1, roughness - 0.3));
+    mat.metalness = Math.max(0, Math.min(1, metalness + 0.3));
+    if (isPhysical) mat.iridescence = Math.max(0, Math.min(1, iridescence + 0.1));
     mat.needsUpdate = true;
   });
-
-  const fmt1 = (v, d) => (v >= 0 ? '+' : '') + v.toFixed(d);
-  document.getElementById('sv-mat-rough').textContent        = fmt1(roughDelta, 2);
-  document.getElementById('sv-mat-metal').textContent        = fmt1(metalDelta, 2);
-  document.getElementById('sv-mat-emissive').textContent     = fmt1(emDelta, 1);
-  document.getElementById('sv-mat-opacity').textContent      = fmt1(opacityDelta, 2);
-  document.getElementById('sv-mat-clearcoat').textContent    = fmt1(clearcoatDelta, 2);
-  document.getElementById('sv-mat-ccrough').textContent      = fmt1(ccRoughDelta, 2);
-  document.getElementById('sv-mat-transmission').textContent = fmt1(transmissionDelta, 2);
-  document.getElementById('sv-mat-ior').textContent          = fmt1(iorDelta, 2);
-  document.getElementById('sv-mat-sheen').textContent        = fmt1(sheenDelta, 2);
-  document.getElementById('sv-mat-iridescence').textContent  = fmt1(iridescenceDelta, 2);
 };
 
-// apply=false でUIだけリセット（モデル読み込み直後に使用）
 window.resetMaterialOffsets = function(apply = true) {
-  ['sl-mat-rough','sl-mat-metal','sl-mat-emissive','sl-mat-opacity',
-   'sl-mat-clearcoat','sl-mat-ccrough','sl-mat-transmission','sl-mat-ior','sl-mat-sheen','sl-mat-iridescence'
-  ].forEach(id => { document.getElementById(id).value = 0; });
-  document.getElementById('sv-mat-rough').textContent        = '+0.00';
-  document.getElementById('sv-mat-metal').textContent        = '+0.00';
-  document.getElementById('sv-mat-emissive').textContent     = '+0.0';
-  document.getElementById('sv-mat-opacity').textContent      = '+0.00';
-  document.getElementById('sv-mat-clearcoat').textContent    = '+0.00';
-  document.getElementById('sv-mat-ccrough').textContent      = '+0.00';
-  document.getElementById('sv-mat-transmission').textContent = '+0.00';
-  document.getElementById('sv-mat-ior').textContent          = '+0.00';
-  document.getElementById('sv-mat-sheen').textContent        = '+0.00';
-  document.getElementById('sv-mat-iridescence').textContent  = '+0.00';
   if (apply) applyMaterialOffsets();
 };
 
