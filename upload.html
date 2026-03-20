@@ -139,13 +139,12 @@
   .storage-info { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--muted); }
   .storage-files { font-size: 11px; color: var(--muted); margin-top: 4px; }
   .storage-deleted { font-size: 11px; color: var(--warn); margin-top: 6px; }
-  .storage-warn { font-size: 11px; color: var(--warn); margin-top: 6px; padding: 6px 10px; background: rgba(255,167,38,0.08); border: 1px solid rgba(255,167,38,0.2); border-radius: 6px; }
 </style>
 </head>
 <body>
 
 <div id="header">
-  <div class="title">GLB <span>Upload</span></div>
+  <div class="title">GLB <span>Upload</span> <span style="font-size:10px;color:var(--muted);font-weight:300">— Cloudflare R2</span></div>
   <button class="icon-btn" onclick="refreshStorage()" title="容量更新">🔄</button>
   <button class="icon-btn" onclick="openDrawer()" title="設定">⚙️</button>
 </div>
@@ -154,10 +153,9 @@
 <div id="settings-drawer">
   <div class="drawer-header"><h2>設定</h2><button class="icon-btn" onclick="closeDrawer()">✕</button></div>
   <div class="drawer-section">
-    <div class="section-title">⚙️ Supabase（初回のみ）</div>
-    <div class="field"><label>Project URL</label><input type="text" id="supabase-url" placeholder="https://xxxx.supabase.co" /></div>
-    <div class="field"><label>API Key</label><input type="password" id="supabase-key" placeholder="sb_publishable_xxxx... または eyJhbG..." /></div>
-    <div class="field"><label>バケット名</label><input type="text" id="supabase-bucket" value="glb-models" /></div>
+    <div class="section-title">☁️ Cloudflare Worker（初回のみ）</div>
+    <div class="field"><label>Worker URL</label><input type="text" id="cf-worker-url" placeholder="https://glb-storage.xxxxx.workers.dev" /></div>
+    <div class="field"><label>API Key</label><input type="password" id="cf-api-key" placeholder="Worker に設定した API_KEY" /></div>
     <button class="drawer-btn" onclick="saveConfig()">設定を保存</button>
     <div class="config-saved" id="config-saved">✓ 保存しました</div>
   </div>
@@ -191,10 +189,9 @@
     <div id="storage-loading">設定を保存すると表示されます</div>
     <div id="storage-detail" style="display:none">
       <div class="storage-bar-wrap"><div class="storage-bar" id="storage-bar"></div></div>
-      <div class="storage-info"><span id="storage-used">0 MB</span><span id="storage-limit">/ 1 GB</span></div>
+      <div class="storage-info"><span id="storage-used">0 MB</span><span id="storage-limit">/ 10 GB</span></div>
       <div class="storage-files" id="storage-files"></div>
       <div class="storage-deleted" id="storage-deleted" style="display:none"></div>
-      <div class="storage-warn" id="storage-size-warn" style="display:none">⚠️ Supabaseのファイルサイズ上限がデフォルト(50MB)の可能性があります。大きいGLBをアップロードする場合は Storage → Settings から上限を引き上げてください。</div>
     </div>
   </div>
 
@@ -252,13 +249,12 @@ function closeDrawer() {
 }
 
 function saveConfig() {
-  const u = trimUrl(document.getElementById('supabase-url').value);
-  const k = document.getElementById('supabase-key').value.trim();
-  if (!u || !k) { alert('URLとキーを入力してください'); return; }
+  const u = trimUrl(document.getElementById('cf-worker-url').value);
+  const k = document.getElementById('cf-api-key').value.trim();
+  if (!u || !k) { alert('Worker URLとAPI Keyを入力してください'); return; }
 
-  localStorage.setItem('sb_url', u);
-  localStorage.setItem('sb_key', k);
-  localStorage.setItem('sb_bucket', document.getElementById('supabase-bucket').value.trim() || 'glb-models');
+  localStorage.setItem('cf_worker_url', u);
+  localStorage.setItem('cf_api_key', k);
 
   const msg = document.getElementById('config-saved');
   msg.style.display = 'block';
@@ -267,32 +263,34 @@ function saveConfig() {
 }
 
 function loadConfig() {
-  document.getElementById('supabase-url').value = localStorage.getItem('sb_url') || '';
-  document.getElementById('supabase-key').value = localStorage.getItem('sb_key') || '';
-  document.getElementById('supabase-bucket').value = localStorage.getItem('sb_bucket') || 'glb-models';
+  document.getElementById('cf-worker-url').value = localStorage.getItem('cf_worker_url') || '';
+  document.getElementById('cf-api-key').value = localStorage.getItem('cf_api_key') || '';
+}
+
+/* ============================================================
+   Cloudflare Worker API helper
+   ============================================================ */
+
+function cfHeaders() {
+  const key = localStorage.getItem('cf_api_key') || '';
+  return { 'X-API-Key': key };
+}
+
+function cfUrl() {
+  return trimUrl(localStorage.getItem('cf_worker_url'));
 }
 
 /* ============================================================
    Storage management & auto-delete
    ============================================================ */
 
-const SUPABASE_FREE_LIMIT = 1 * 1024 * 1024 * 1024; // 1GB
-const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
-let bucketFileSizeLimit = 0;
-
-/** Supabase APIヘッダー */
-function sbHeaders(key, contentType) {
-  const h = { 'Authorization': 'Bearer ' + key, 'apikey': key };
-  if (contentType) h['Content-Type'] = contentType;
-  return h;
-}
+const R2_FREE_LIMIT = 10 * 1024 * 1024 * 1024; // 10GB
 
 async function refreshStorage() {
-  const sbUrl = trimUrl(localStorage.getItem('sb_url'));
-  const sbKey = localStorage.getItem('sb_key')?.trim();
-  const sbBucket = localStorage.getItem('sb_bucket') || 'glb-models';
+  const workerUrl = cfUrl();
+  const apiKey = localStorage.getItem('cf_api_key')?.trim();
 
-  if (!sbUrl || !sbKey) {
+  if (!workerUrl || !apiKey) {
     document.getElementById('storage-loading').textContent = '設定を保存すると表示されます';
     document.getElementById('storage-loading').style.display = 'block';
     document.getElementById('storage-detail').style.display = 'none';
@@ -304,49 +302,30 @@ async function refreshStorage() {
   document.getElementById('storage-detail').style.display = 'none';
 
   try {
-    // バケット情報取得はservice_role keyが必要なため省略（anon keyでは400エラーになる）
-
-    // ファイル一覧取得（ページネーション対応）
-    let allFiles = [];
-    let offset = 0;
-    while (true) {
-      const res = await fetch(sbUrl + '/storage/v1/object/list/' + sbBucket, {
-        method: 'POST',
-        headers: sbHeaders(sbKey, 'application/json'),
-        body: JSON.stringify({ prefix: '', limit: 1000, offset, sortBy: { column: 'name', order: 'asc' } })
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const files = await res.json();
-      allFiles = allFiles.concat(files.filter(f => f.name && f.metadata));
-      if (files.length < 1000) break;
-      offset += 1000;
-    }
-
-    // 1年経過ファイルの自動削除（updated_at 優先）
-    const now = Date.now();
+    // 1年経過ファイルの自動削除
     let deletedCount = 0;
-    const expiredFiles = allFiles.filter(f => {
-      const ts = f.updated_at || f.created_at || f.metadata?.lastModified;
-      if (!ts) return false;
-      return (now - new Date(ts).getTime()) > ONE_YEAR_MS;
-    });
-
-    if (expiredFiles.length > 0) {
-      const names = expiredFiles.map(f => f.name);
-      const delRes = await fetch(sbUrl + '/storage/v1/object/' + sbBucket, {
+    try {
+      const delRes = await fetch(workerUrl + '/files/expired', {
         method: 'DELETE',
-        headers: sbHeaders(sbKey, 'application/json'),
-        body: JSON.stringify({ prefixes: names })
+        headers: cfHeaders(),
       });
       if (delRes.ok) {
-        deletedCount = names.length;
-        allFiles = allFiles.filter(f => !names.includes(f.name));
+        const delData = await delRes.json();
+        deletedCount = delData.deletedCount || 0;
       }
-    }
+    } catch (e) { /* ignore */ }
 
-    // UI更新
-    const totalBytes = allFiles.reduce((s, f) => s + (f.metadata?.size || 0), 0);
-    const pct = Math.min((totalBytes / SUPABASE_FREE_LIMIT) * 100, 100);
+    // ストレージ使用量を取得
+    const res = await fetch(workerUrl + '/storage', { headers: cfHeaders() });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'HTTP ' + res.status);
+    }
+    const data = await res.json();
+
+    const totalBytes = data.usedBytes || 0;
+    const limitBytes = data.limitBytes || R2_FREE_LIMIT;
+    const pct = Math.min((totalBytes / limitBytes) * 100, 100);
 
     document.getElementById('storage-loading').style.display = 'none';
     document.getElementById('storage-detail').style.display = 'block';
@@ -359,8 +338,8 @@ async function refreshStorage() {
       totalBytes > 1024 * 1024 * 1024
         ? (totalBytes / 1024 / 1024 / 1024).toFixed(2) + ' GB'
         : (totalBytes / 1024 / 1024).toFixed(1) + ' MB';
-    document.getElementById('storage-limit').textContent = '/ ' + (SUPABASE_FREE_LIMIT / 1024 / 1024 / 1024).toFixed(0) + ' GB';
-    document.getElementById('storage-files').textContent = allFiles.length + ' ファイル';
+    document.getElementById('storage-limit').textContent = '/ ' + (limitBytes / 1024 / 1024 / 1024).toFixed(0) + ' GB';
+    document.getElementById('storage-files').textContent = (data.fileCount || 0) + ' ファイル';
 
     const delEl = document.getElementById('storage-deleted');
     if (deletedCount > 0) {
@@ -427,14 +406,10 @@ async function boostEmissive(buf, offset) {
   let count = 0;
 
   (gltf.materials || []).forEach(mat => {
-    // emissiveFactor [R,G,B] を +offset（上限1.0）
     if (mat.emissiveFactor) {
       mat.emissiveFactor = mat.emissiveFactor.map(v => Math.min(1.0, v + offset));
       count++;
-    } else {
-      // emissiveFactor未設定でも KHR_materials_emissive_strength があれば加算
     }
-    // KHR_materials_emissive_strength の strength を +offset
     const ext = mat.extensions?.KHR_materials_emissive_strength;
     if (ext != null) {
       ext.emissiveStrength = (ext.emissiveStrength || 1.0) + offset;
@@ -442,7 +417,6 @@ async function boostEmissive(buf, offset) {
     }
   });
 
-  // GLBを再構築
   let jsonStr = JSON.stringify(gltf);
   while (jsonStr.length % 4) jsonStr += ' ';
   const jsonBytes = new TextEncoder().encode(jsonStr);
@@ -486,16 +460,13 @@ async function addSheen(buf) {
 
   const gltf = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, jsonOff, jsonLen)));
 
-  // 既存のsheenColorFactorに +0.5（なければスキップ）
   (gltf.materials || []).forEach(mat => {
     const sheen = mat.extensions?.KHR_materials_sheen;
     if (!sheen) return;
-    // sheenColorFactorがなければ[0,0,0]として扱い +0.5
     const base = sheen.sheenColorFactor || [0, 0, 0];
     sheen.sheenColorFactor = base.map(v => Math.min(1.0, v + 0.5));
   });
 
-  // GLBを再構築
   let jsonStr = JSON.stringify(gltf);
   while (jsonStr.length % 4) jsonStr += ' ';
   const jsonBytes = new TextEncoder().encode(jsonStr);
@@ -524,23 +495,19 @@ async function addSheen(buf) {
 /** GLBバイナリからKHR_lights_punctualを除去 */
 async function removeLights(buf) {
   const view = new DataView(buf);
-
-  // GLBマジックナンバー確認
   if (view.getUint32(0, true) !== 0x46546C67) throw new Error('GLBではありません');
   const version = view.getUint32(4, true);
 
-  // チャンク位置を特定
   let off = 12, jsonOff = -1, jsonLen = 0, binOff = -1, binLen = 0;
   while (off < buf.byteLength) {
     const chunkLen = view.getUint32(off, true);
     const chunkType = view.getUint32(off + 4, true);
-    if (chunkType === 0x4E4F534A) { jsonOff = off + 8; jsonLen = chunkLen; }      // JSON
-    else if (chunkType === 0x004E4942) { binOff = off; binLen = chunkLen; }        // BIN (ヘッダ含む位置)
+    if (chunkType === 0x4E4F534A) { jsonOff = off + 8; jsonLen = chunkLen; }
+    else if (chunkType === 0x004E4942) { binOff = off; binLen = chunkLen; }
     off += 8 + chunkLen;
   }
   if (jsonOff < 0) throw new Error('JSONチャンクなし');
 
-  // JSONを解析してライト情報を削除
   const gltf = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, jsonOff, jsonLen)));
   let count = 0;
 
@@ -564,9 +531,8 @@ async function removeLights(buf) {
     }
   });
 
-  // GLBを再構築
   let jsonStr = JSON.stringify(gltf);
-  while (jsonStr.length % 4) jsonStr += ' '; // 4バイト境界パディング
+  while (jsonStr.length % 4) jsonStr += ' ';
   const jsonBytes = new TextEncoder().encode(jsonStr);
 
   const total = 12 + 8 + jsonBytes.length + (binOff >= 0 ? 8 + binLen : 0);
@@ -574,17 +540,13 @@ async function removeLights(buf) {
   const outView = new DataView(out);
   const outArr = new Uint8Array(out);
 
-  // GLBヘッダ
-  outView.setUint32(0, 0x46546C67, true); // magic
+  outView.setUint32(0, 0x46546C67, true);
   outView.setUint32(4, version, true);
   outView.setUint32(8, total, true);
-
-  // JSONチャンク
   outView.setUint32(12, jsonBytes.length, true);
   outView.setUint32(16, 0x4E4F534A, true);
   outArr.set(jsonBytes, 20);
 
-  // BINチャンク
   if (binOff >= 0) {
     const bs = 20 + jsonBytes.length;
     outView.setUint32(bs, binLen, true);
@@ -596,13 +558,6 @@ async function removeLights(buf) {
 }
 
 /* ============================================================
-   GLB Processing: Mesh merge (vanilla JS)
-   同一マテリアルのプリミティブをワールド空間で統合
-   ============================================================ */
-
-/** col-major 4×4 行列乗算 */
-
-/* ============================================================
    GLB Processing: Texture compression
    ============================================================ */
 
@@ -612,13 +567,12 @@ async function compressTextures(buf, maxSize, quality) {
   if (view.getUint32(0, true) !== 0x46546C67) throw new Error('GLBではありません');
   const version = view.getUint32(4, true);
 
-  // チャンク位置特定
   let off = 12, jsonOff = -1, jsonLen = 0, binOff = -1, binLen = 0;
   while (off < buf.byteLength) {
     const chunkLen = view.getUint32(off, true);
     const chunkType = view.getUint32(off + 4, true);
     if (chunkType === 0x4E4F534A) { jsonOff = off + 8; jsonLen = chunkLen; }
-    else if (chunkType === 0x004E4942) { binOff = off + 8; binLen = chunkLen; } // BINデータ開始位置
+    else if (chunkType === 0x004E4942) { binOff = off + 8; binLen = chunkLen; }
     off += 8 + chunkLen;
   }
   if (jsonOff < 0) throw new Error('JSONチャンクなし');
@@ -630,11 +584,10 @@ async function compressTextures(buf, maxSize, quality) {
 
   const binData = new Uint8Array(buf, binOff, binLen);
   const bufferViews = gltf.bufferViews || [];
-  const replacements = []; // { bvIndex, data, origLen }
+  const replacements = [];
   let totalSaved = 0;
   let compressed = 0;
 
-  // 各画像を処理
   for (let i = 0; i < gltf.images.length; i++) {
     const img = gltf.images[i];
     if (img.bufferView === undefined) continue;
@@ -653,12 +606,10 @@ async function compressTextures(buf, maxSize, quality) {
         el.onload = () => {
           let w = el.width, h = el.height;
 
-          // 既にサイズ内のJPEGはスキップ
           if (w <= maxSize && h <= maxSize && img.mimeType === 'image/jpeg') {
             resolve(null); return;
           }
 
-          // リサイズ
           if (w > maxSize || h > maxSize) {
             const s = maxSize / Math.max(w, h);
             w = Math.round(w * s); h = Math.round(h * s);
@@ -669,7 +620,6 @@ async function compressTextures(buf, maxSize, quality) {
           const ctx = c.getContext('2d');
           ctx.drawImage(el, 0, 0, w, h);
 
-          // アルファチャンネル検出 → PNGかJPEGか判定
           const pxData = ctx.getImageData(0, 0, w, h).data;
           let hasAlpha = false;
           for (let p = 3; p < pxData.length; p += 4) {
@@ -701,14 +651,12 @@ async function compressTextures(buf, maxSize, quality) {
 
   if (!replacements.length) return { buffer: buf, saved: 0, compressed: 0 };
 
-  // バイナリを再構築（bufferView のオフセットを4バイト境界で更新）
   const replaceMap = new Map();
   replacements.forEach(r => replaceMap.set(r.bvIndex, r));
 
   const bvEntries = bufferViews.map((bv, idx) => ({ idx, offset: bv.byteOffset || 0, length: bv.byteLength }));
   bvEntries.sort((a, b) => a.offset - b.offset);
 
-  /** 4バイト境界にパディング */
   function align4(data) {
     const pad = (4 - data.length % 4) % 4;
     if (pad === 0) return data;
@@ -721,7 +669,6 @@ async function compressTextures(buf, maxSize, quality) {
   let cursor = 0;
 
   for (const entry of bvEntries) {
-    // ギャップを埋める（4バイト境界にアライン）
     if (entry.offset > cursor) newParts.push(align4(binData.slice(cursor, entry.offset)));
 
     const newOffset = newParts.reduce((s, p) => s + p.length, 0);
@@ -740,7 +687,6 @@ async function compressTextures(buf, maxSize, quality) {
 
   if (cursor < binLen) newParts.push(align4(binData.slice(cursor)));
 
-  // 新バイナリ結合（全体も4バイト境界）
   let newBinLen = newParts.reduce((s, p) => s + p.length, 0);
   const binPad = (4 - newBinLen % 4) % 4;
   newBinLen += binPad;
@@ -750,7 +696,6 @@ async function compressTextures(buf, maxSize, quality) {
 
   if (gltf.buffers && gltf.buffers[0]) gltf.buffers[0].byteLength = newBinLen;
 
-  // GLB再構築
   let jsonStr = JSON.stringify(gltf);
   while (jsonStr.length % 4) jsonStr += ' ';
   const jsonBytes = new TextEncoder().encode(jsonStr);
@@ -779,7 +724,6 @@ async function compressTextures(buf, maxSize, quality) {
    QR Code (ローカル生成: qrcode.js)
    ============================================================ */
 
-/** QRコードをcanvasで生成してcontainerに追加 */
 function generateQR(container, text) {
   container.innerHTML = '';
   try {
@@ -791,11 +735,9 @@ function generateQR(container, text) {
       colorLight: '#ffffff',
       correctLevel: QRCode.CorrectLevel.M
     });
-    // QRCode.jsが生成するimg/canvasにスタイル適用
     const el = container.querySelector('img, canvas');
     if (el) { el.style.borderRadius = '4px'; el.style.display = 'block'; }
   } catch (e) {
-    // フォールバック: URLテキスト表示
     const box = document.createElement('div');
     box.style.cssText = 'width:128px;height:128px;background:#fff;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:8px;text-align:center;';
     const icon = document.createElement('div');
@@ -851,10 +793,6 @@ function renderQueue() {
   queue.forEach((item, i) => {
     const changed = item.newName !== item.file.name;
     const sizeMB = item.file.size / 1024 / 1024;
-    const overLimit = bucketFileSizeLimit > 0 && item.file.size > bucketFileSizeLimit;
-    const sizeWarn = overLimit
-      ? '<div class="file-warn">⚠️ バケット上限(' + (bucketFileSizeLimit / 1024 / 1024).toFixed(0) + 'MB)を超えています。圧縮で小さくならない場合は上限引き上げが必要です。</div>'
-      : '';
 
     const div = document.createElement('div');
     div.className = 'file-item';
@@ -865,7 +803,6 @@ function renderQueue() {
         '<div class="file-orig">' + esc(item.file.name) + '</div>' +
         '<div class="file-new">' + esc(item.newName) + (changed ? ' <span style="color:var(--warn);font-size:10px">✦変換</span>' : '') + '</div>' +
         '<div class="file-size">' + sizeMB.toFixed(1) + ' MB</div>' +
-        sizeWarn +
         '<div class="progress-wrap" id="pw-' + item.id + '"><div class="progress-bar" id="pb-' + item.id + '"></div></div>' +
         '<div class="result-section" id="rs-' + item.id + '"></div>' +
       '</div>' +
@@ -884,17 +821,17 @@ function clearQueue() {
 }
 
 /* ============================================================
-   Upload
+   Upload — Cloudflare Worker 版
    ============================================================ */
 
 async function uploadAll() {
-  const sbUrl = trimUrl(localStorage.getItem('sb_url'));
-  const sbKey = localStorage.getItem('sb_key')?.trim();
-  const sbBucket = localStorage.getItem('sb_bucket') || 'glb-models';
+  const workerUrl = cfUrl();
+  const apiKey = localStorage.getItem('cf_api_key')?.trim();
+
   // ビューアーURL: upload.htmlと同じディレクトリのindex.htmlを自動算出
   const viewerBase = trimUrl(window.location.href.replace(/\/[^\/]*$/, ''));
 
-  if (!sbUrl || !sbKey) { alert('右上の⚙️から設定を保存してください'); return; }
+  if (!workerUrl || !apiKey) { alert('右上の⚙️から設定を保存してください'); return; }
 
   const btn = document.getElementById('btn-upload');
   btn.disabled = true;
@@ -920,7 +857,7 @@ async function uploadAll() {
       const origSize = buf.byteLength;
       setPb(item.id, 10);
 
-      // ① ライト削除（元GLBに対して実施）
+      // ① ライト削除
       if (doLights) {
         try {
           const r = await removeLights(buf);
@@ -942,7 +879,7 @@ async function uploadAll() {
         addLog('  Sheen設定エラー: ' + e.message, 'err');
       }
 
-      // ③ テクスチャ圧縮（元バイナリレイアウトのまま処理）
+      // ③ テクスチャ圧縮
       if (doCompress) {
         try {
           setSt(item.id, 'processing', '圧縮中...');
@@ -959,21 +896,14 @@ async function uploadAll() {
       }
       setPb(item.id, 40);
 
+      // R2 の無料枠は 1 ファイルあたりサイズ制限なし（Workers経由のリクエストbodyは最大100MBだが通常GLBなら問題ない）
       setPb(item.id, 60);
 
-      // ファイルサイズチェック
-      if (bucketFileSizeLimit > 0 && buf.byteLength > bucketFileSizeLimit) {
-        throw new Error(
-          'ファイルサイズ(' + (buf.byteLength / 1024 / 1024).toFixed(1) + 'MB)がバケット上限(' +
-          (bucketFileSizeLimit / 1024 / 1024).toFixed(0) + 'MB)を超えています。Supabase Storage設定で上限を引き上げてください。'
-        );
-      }
-
-      // アップロード
+      // アップロード（Cloudflare Worker へ POST）
       setSt(item.id, 'processing', 'アップロード中...');
-      const res = await fetch(sbUrl + '/storage/v1/object/' + sbBucket + '/' + encodeURIComponent(item.newName), {
+      const res = await fetch(workerUrl + '/upload/' + encodeURIComponent(item.newName), {
         method: 'POST',
-        headers: { ...sbHeaders(sbKey), 'Content-Type': 'model/gltf-binary', 'x-upsert': 'true' },
+        headers: { ...cfHeaders(), 'Content-Type': 'model/gltf-binary' },
         body: new Blob([buf], { type: 'model/gltf-binary' })
       });
       setPb(item.id, 90);
@@ -983,15 +913,16 @@ async function uploadAll() {
         let errMsg = 'HTTP ' + res.status;
         try {
           const ej = JSON.parse(errText);
-          errMsg = ej.message || ej.error || errMsg;
+          errMsg = ej.error || ej.message || errMsg;
         } catch (e) {
           errMsg += ': ' + errText.substring(0, 200);
         }
         throw new Error(errMsg);
       }
 
-      // 成功
-      const glbUrl = sbUrl + '/storage/v1/object/public/' + sbBucket + '/' + encodeURIComponent(item.newName);
+      // 成功 — Worker が返す公開URL を使用
+      const resData = await res.json();
+      const glbUrl = resData.url || (workerUrl + '/file/' + encodeURIComponent(item.newName));
       const viewerUrl = viewerBase + '/?g=' + encodeURIComponent(glbUrl) + '&u=' + today;
       item.status = 'done';
       setPb(item.id, 100);
@@ -1035,9 +966,7 @@ function showResult(id, glbUrl, viewerUrl) {
     '<div class="qr-info"><div class="qr-title">📱 QRコード</div>' +
     '<div class="qr-hint">スマートフォンでスキャンすると<br>ウォークスルーが開きます</div></div></div>';
 
-  // ローカルQR生成
   generateQR(document.getElementById('qr-container-' + id), viewerUrl);
-
   sec.classList.add('visible');
 }
 
@@ -1077,7 +1006,7 @@ function addLog(msg, type) {
   const container = document.getElementById('log-content');
   const line = document.createElement('div');
   line.className = 'log-' + type;
-  line.textContent = msg; // textContent = XSS safe
+  line.textContent = msg;
   container.appendChild(line);
   container.scrollTop = container.scrollHeight;
 }
